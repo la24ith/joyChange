@@ -1,0 +1,34 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
+buildscript {
+    // أضف أو تأكد من وجود هذا القسم
+    repositories {
+        google()        // لازم لمكتبات Android
+        mavenCentral()  // لازم لمكتبات Gradle و Java
+        // (اختياري) maven { url "https://jitpack.io" }
+    }
+    
+    dependencies {
+        // استخدم إصداراً متوافقاً مع مشروعك
+        // إذا كنت تريد 7.4.2 بالتحديد، تأكد من وجوده
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        
+        // تبعيات أخرى مثل:
+    }
+}
