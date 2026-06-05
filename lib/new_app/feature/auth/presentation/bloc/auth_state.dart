@@ -75,14 +75,29 @@ final class PendingDeviceApproval extends AuthState {
 final class Authenticated extends AuthState {
   final User user;
   final String token;
+  final bool hasActiveSubscription;
 
   const Authenticated({
     required this.user,
     required this.token,
+    this.hasActiveSubscription = true,
   });
 
   @override
-  List<Object?> get props => [user, token];
+  List<Object?> get props => [user, token, hasActiveSubscription];
+
+  Authenticated copyWith({
+    User? user,
+    String? token,
+    bool? hasActiveSubscription,
+  }) {
+    return Authenticated(
+      user: user ?? this.user,
+      token: token ?? this.token,
+      hasActiveSubscription:
+          hasActiveSubscription ?? this.hasActiveSubscription,
+    );
+  }
 }
 
 /// User logged out (can be redirected to login)

@@ -26,7 +26,6 @@ class HiveService {
   Future<void> _openBoxes() async {
     await Hive.openBox(StorageKeys.postsBox);
     await Hive.openBox(StorageKeys.weightsBox);
-    await Hive.openBox(StorageKeys.notificationsBox);
     await Hive.openBox(StorageKeys.dailyAnswersBox);
     await Hive.openBox(StorageKeys.syncQueueBox);
   }

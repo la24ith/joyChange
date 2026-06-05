@@ -4,7 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorageService {
   static const AndroidOptions _androidOptions = AndroidOptions(
-    encryptedSharedPreferences: true, // More secure on Android
+    encryptedSharedPreferences: true,
   );
 
   final FlutterSecureStorage _storage;
@@ -12,34 +12,29 @@ class SecureStorageService {
   SecureStorageService()
       : _storage = const FlutterSecureStorage(aOptions: _androidOptions);
 
-  // Write operations
   Future<void> write({required String key, required String value}) async {
+    print(
+        '💾 SecureStorage write: key=$key, value=${value.substring(0, 20)}...');
     await _storage.write(key: key, value: value);
+    print('✅ SecureStorage write completed');
   }
 
-  // Read operations
   Future<String?> read({required String key}) async {
-    return await _storage.read(key: key);
+    final value = await _storage.read(key: key);
+    print('🔍 SecureStorage read: key=$key, found=${value != null}');
+    if (value != null) {
+      print('🔍 Value: ${value.substring(0, 20)}...');
+    }
+    return value;
   }
 
-  // Delete operations
   Future<void> delete({required String key}) async {
+    print('🗑️ SecureStorage delete: key=$key');
     await _storage.delete(key: key);
   }
 
-  // Clear all data (logout)
   Future<void> clearAll() async {
+    print('🗑️ SecureStorage clear all');
     await _storage.deleteAll();
-  }
-
-  // Check if key exists
-  Future<bool> containsKey({required String key}) async {
-    final value = await _storage.read(key: key);
-    return value != null;
-  }
-
-  // Read all keys and values (for debugging)
-  Future<Map<String, String>> readAll() async {
-    return await _storage.readAll();
   }
 }

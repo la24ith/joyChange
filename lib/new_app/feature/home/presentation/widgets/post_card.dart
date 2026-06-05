@@ -2,200 +2,120 @@
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:go_router/go_router.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import '../../domain/entities/post.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;
+  final VoidCallback onTap;
+  final double? screenWidth;
 
   const PostCard({
     super.key,
     required this.post,
+    required this.onTap,
+    this.screenWidth,
   });
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600;
+    final width = screenWidth ?? MediaQuery.of(context).size.width;
+    final isTablet = width >= 600;
+    final imageHeight = isTablet ? 200.0 : 180.0;
+    final paddingSize = isTablet ? 16.0 : 12.0;
+    final titleFontSize = isTablet ? 18.0 : 16.0;
+    final subtitleFontSize = isTablet ? 13.0 : 12.0;
 
     return GestureDetector(
-      onTap: () {
-        context.push('/post/${post.id}');
-      },
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: AppColors.softShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail with overlay
+            // Thumbnail
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(20)),
-              child: Stack(
-                children: [
-                  if (post.thumbnailUrl != null)
-                    CachedNetworkImage(
-                      imageUrl: post.thumbnailUrl!,
-                      height: isTablet ? 200 : 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        height: isTablet ? 200 : 180,
-                        color: Colors.grey[100],
-                        child: const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        height: isTablet ? 200 : 180,
-                        color: Colors.grey[100],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          color: Colors.grey[400],
-                          size: 40,
-                        ),
-                      ),
-                    ),
-
-                  // Media type indicator
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.image_outlined,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'منشور',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              child: CachedNetworkImage(
+                imageUrl: post.thumbnailUrl ?? '',
+                height: imageHeight,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  height: imageHeight,
+                  color: AppColors.surfaceVariant,
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                ],
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  height: imageHeight,
+                  color: AppColors.surfaceVariant,
+                  child: const Icon(
+                    Icons.image_not_supported,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ),
 
             // Content
             Padding(
-              padding: EdgeInsets.all(isTablet ? 16 : 12),
+              padding: EdgeInsets.all(paddingSize),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title
                   Text(
                     post.title,
-                    style: TextStyle(
-                      fontSize: isTablet ? 18 : 16,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1A1A1A),
-                      height: 1.3,
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: titleFontSize,
+                          height: 1.3,
+                        ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-
-                  const SizedBox(height: 8),
-
-                  // Excerpt
-                  Text(
-                    post.excerpt ?? post.content,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
                   const SizedBox(height: 12),
-
-                  // Meta info
                   Row(
                     children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 12,
-                        color: Colors.grey[500],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        post.formattedDate,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[500],
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor:
+                            AppColors.primaryLight.withOpacity(0.2),
+                        child: Text(
+                          post.author.name.isNotEmpty
+                              ? post.author.name[0].toUpperCase()
+                              : 'م',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.remove_red_eye_outlined,
-                        size: 12,
-                        color: Colors.grey[500],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatViewCount(post.viewCount),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                      const Spacer(),
-                      // Read more indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'اقرأ',
+                              post.author.name,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: subtitleFontSize,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.teal,
                               ),
                             ),
-                            SizedBox(width: 4),
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 12,
-                              color: Colors.teal,
+                            Text(
+                              _formatDate(post.publishedAt),
+                              style: TextStyle(
+                                fontSize: subtitleFontSize - 2,
+                                color: AppColors.textTertiary,
+                              ),
                             ),
                           ],
                         ),
@@ -211,10 +131,14 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  String _formatViewCount(int count) {
-    if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}k';
-    }
-    return count.toString();
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) return 'اليوم';
+    if (diff.inDays == 1) return 'أمس';
+    if (diff.inDays < 7) return 'منذ ${diff.inDays} أيام';
+    if (diff.inDays < 30) return 'منذ ${(diff.inDays / 7).floor()} أسابيع';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

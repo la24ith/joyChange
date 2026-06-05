@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
-import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/login_screen.dart';
-import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/custom_text_field.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/gradient_button.dart';
 import '../bloc/auth_bloc.dart';
@@ -30,12 +30,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final ValueNotifier<bool> _obscureConfirmPassword = ValueNotifier<bool>(true);
   final ValueNotifier<bool> _agreeTerms = ValueNotifier<bool>(false);
 
+  bool _isLoading = false;
+  late String password;
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
     _confirmPasswordController.dispose();
     _obscurePassword.dispose();
     _obscureConfirmPassword.dispose();
@@ -53,43 +54,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+            onPressed: () => Get.offAllNamed('/login'),
           ),
           title: const Text('إنشاء حساب جديد'),
         ),
         body: BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
-            if (state is AuthError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: AppColors.error,
-                  content: Text(state.message),
-                ),
-              );
-            } else if (state is Authenticated) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  backgroundColor: AppColors.success,
-                  content: Text('تم إنشاء الحساب بنجاح'),
-                ),
-              );
-              Navigator.pushReplacementNamed(context, '/login');
+            if (state is LoginLoading) {
+              setState(() => _isLoading = true);
+            } else {
+              setState(() => _isLoading = false);
+            }
+
+            if (state is Authenticated) {
+              // ✅ تسجيل ناجح واشتراك فعال
+              _showSnackBar('تم إنشاء الحساب بنجاح', isError: false);
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  Get.offAllNamed('/home');
+                }
+              });
             } else if (state is PendingSubscription) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: Colors.orange,
-                  content: Text(state.message),
-                ),
-              );
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PendingDeviceApprovalScreen(
+              // ✅ ✅ ✅ الحالة المهمة: بانتظار تفعيل الاشتراك
+              print('🎯 Navigating to PendingSubscriptionScreen');
+              _showSnackBar(state.message, isError: false);
+              if (mounted) {
+                Get.to(
+                  () => PendingSubscriptionScreen(
                     message: state.message,
                     email: state.email,
+                    userId: state.userId,
+                    password: password,
                   ),
-                ),
-              );
+                );
+              }
+            } else if (state is SubscriptionInactive) {
+              _showSnackBar(state.message, isError: true);
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  Get.toNamed('/subscription-inactive',
+                      arguments: state.message);
+                }
+              });
+            } else if (state is PendingDeviceApproval) {
+              _showSnackBar(state.message, isError: false);
+              if (mounted) {
+                Get.toNamed('/pending-device', arguments: {
+                  'message': state.message,
+                  'email': state.email,
+                });
+              }
+            } else if (state is AuthError) {
+              _showSnackBar(state.message, isError: true);
             }
           },
           child: BlocBuilder<AuthBloc, AuthState>(
@@ -115,11 +131,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           horizontal: 24, vertical: 20),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withOpacity(0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
+                              color: Colors.black.withOpacity(0.05),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -265,24 +281,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 isLoading: isLoading,
                                 onPressed: () {
                                   if (!_agreeTerms.value) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            'يجب الموافقة على الشروط والأحكام'),
-                                      ),
-                                    );
+                                    _showSnackBar(
+                                        'يجب الموافقة على الشروط والأحكام',
+                                        isError: true);
                                     return;
                                   }
                                   if (_formKey.currentState!.validate()) {
+                                    password = _passwordController.text.trim();
+
+                                    print('PASSWORD SAVED = $password');
+
                                     context.read<AuthBloc>().add(
                                           RegisterEvent(
                                             name: _nameController.text.trim(),
-                                            email: _emailController.text.trim(),
-                                            password:
-                                                _passwordController.text.trim(),
-                                            /*   passwordConfirmation:
-                                                _confirmPasswordController.text
-                                                    .trim(),*/
+                                            email: _emailController.text
+                                                .trim()
+                                                .toLowerCase(),
+                                            password: password,
                                             phone: _phoneController.text.trim(),
                                           ),
                                         );
@@ -295,10 +310,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 children: [
                                   const Text('لديك حساب بالفعل؟'),
                                   TextButton(
-                                    onPressed: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const LoginScreen())),
+                                    onPressed: () => Get.offAllNamed('/login'),
                                     child: Text(
                                       'تسجيل الدخول',
                                       style: TextStyle(
@@ -320,6 +332,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.error : AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: isError ? 3 : 2),
       ),
     );
   }

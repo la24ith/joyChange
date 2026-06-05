@@ -1,6 +1,7 @@
 // lib/features/home/data/datasources/home_remote_ds.dart
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/constant/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/errors/exceptions.dart';
@@ -13,16 +14,22 @@ class HomeRemoteDataSource {
       : _dioClient = dioClient ?? DioClient.instance;
 
   /// Get all posts with pagination
-  Future<List<PostModel>> getPosts({int page = 1}) async {
+  Future<List<PostModel>> getPosts({
+    int page = 1,
+    int limit = 10, // ✅ أضف limit
+  }) async {
     try {
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       print('📤 GET POSTS REQUEST');
-      print('📍 URL: ${ApiEndpoints.posts}?page=$page');
+      print('📍 URL: ${ApiEndpoints.posts}?page=$page&limit=$limit');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dioClient.get(
         ApiEndpoints.posts,
-        queryParameters: {'page': page},
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
       );
 
       print('📥 GET POSTS RESPONSE');
@@ -31,6 +38,7 @@ class HomeRemoteDataSource {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> data = response.data['data'];
+        print('✅ Loaded ${data.length} posts');
         return data.map((json) => PostModel.fromJson(json)).toList();
       } else {
         throw ServerException(
@@ -149,5 +157,10 @@ class HomeRemoteDataSource {
         statusCode: e.response?.statusCode,
       );
     }
+  }
+
+  Future<String?> _getStoredToken() async {
+    final storage = FlutterSecureStorage();
+    return await storage.read(key: 'access_token');
   }
 }

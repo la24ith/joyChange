@@ -4,24 +4,20 @@ import 'package:dartz/dartz.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
 import '../repositories/auth_repository.dart';
 
-/// Input parameters for registration
 class RegisterParams {
   final String name;
   final String email;
   final String password;
-  final String passwordConfirmation;
   final String phone;
 
   const RegisterParams({
     required this.name,
     required this.email,
     required this.password,
-    required this.passwordConfirmation,
     required this.phone,
   });
 }
 
-/// Result of registration (contains userId for pending activation)
 class RegisterResult {
   final String message;
   final int userId;
@@ -34,16 +30,13 @@ class RegisterResult {
   });
 }
 
-/// Use case for user registration
 class RegisterUseCase {
   final AuthRepository repository;
 
   RegisterUseCase(this.repository);
 
-  /// Execute registration with given parameters
-  /// Returns RegisterResult on success, [Failure] on error
   Future<Either<Failure, RegisterResult>> call(RegisterParams params) async {
-    // Validate name
+    // Validations
     if (params.name.isEmpty) {
       return Left(ValidationFailure(
         message: 'Name is required',
@@ -62,7 +55,6 @@ class RegisterUseCase {
       ));
     }
 
-    // Validate email
     if (params.email.isEmpty) {
       return Left(ValidationFailure(
         message: 'Email is required',
@@ -81,7 +73,6 @@ class RegisterUseCase {
       ));
     }
 
-    // Validate password
     if (params.password.isEmpty) {
       return Left(ValidationFailure(
         message: 'Password is required',
@@ -100,18 +91,7 @@ class RegisterUseCase {
       ));
     }
 
-    // Validate password confirmation
-    if (params.password != params.passwordConfirmation) {
-      return Left(ValidationFailure(
-        message: 'Password confirmation does not match',
-        errors: {
-          'password_confirmation': ['Passwords do not match']
-        },
-      ));
-    }
-
-    // Validate phone (optional but if provided should be valid)
-    if (params.phone.isNotEmpty && params.phone.length < 10) {
+    if (params.phone.isNotEmpty && params.phone.length < 8) {
       return Left(ValidationFailure(
         message: 'Invalid phone number',
         errors: {
@@ -125,21 +105,17 @@ class RegisterUseCase {
       name: params.name,
       email: params.email,
       password: params.password,
-      passwordConfirmation: params.passwordConfirmation,
+      passwordConfirmation: params.password,
       phone: params.phone,
     );
 
-    // Transform the result to include userId
     return result.fold(
       (failure) => Left(failure),
-      (response) {
-        // response contains message and user data
-        return Right(RegisterResult(
-          message: response.message,
-          userId: response.userId,
-          email: params.email,
-        ));
-      },
+      (response) => Right(RegisterResult(
+        message: response.message,
+        userId: response.userId,
+        email: response.email,
+      )),
     );
   }
 

@@ -23,4 +23,38 @@ class ApiEndpoints {
   static String get fullProfile => '$baseUrl$profile';
   static String get fullChangePassword => '$baseUrl$changePassword';
   static String get fullSubscriptionStatus => '$baseUrl$subscriptionStatus';
+
+  static const String posts = '/api/posts';
+  static const String featuredPosts = '/api/posts/featured';
+  static const String categories = '/api/categories';
+  static const String media = '/api/posts';
+
+// Weight Tracking Endpoints
+  static const String weights = '/api/weights';
+  static const String weightStats = '/api/weights/stats';
+  static const String weightChart = '/api/weights/chart-data';
+  static const String weightIdealStatus = '/api/weights/ideal-status';
+  static const String addWeight = '/api/weights';
+
+  static const String dailyCommitmentToday = '/api/daily-commitment/today';
+  static const String dailyCommitmentAnswer = '/api/daily-commitment/answer';
+  static const String dailyCommitmentHistory = '/api/daily-commitment/history';
+  static const String dailyCommitmentStats = '/api/daily-commitment/stats';
+
+  static const String activeAds = '/api/ads/active';
+
+  static String getFullMediaUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;
+
+    final cleanBase = baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+
+    // تنظيف المسار
+    String cleanPath = path;
+    cleanPath = cleanPath.replaceAll(
+        RegExp(r'^(/storage/|storage/|/public/|public/)'), '');
+
+    // بناء الرابط النهائي
+    return '$cleanBase/storage/$cleanPath';
+  }
 }

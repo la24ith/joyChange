@@ -3,6 +3,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/utils/device_info.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -11,12 +13,14 @@ class PendingSubscriptionScreen extends StatefulWidget {
   final String message;
   final String email;
   final int userId;
+  final String password;
 
   const PendingSubscriptionScreen({
     super.key,
     required this.message,
     required this.email,
     required this.userId,
+    required this.password,
   });
 
   @override
@@ -42,6 +46,16 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
     super.dispose();
   }
 
+  Future<String> _getDeviceId() async {
+    try {
+      final deviceInfoUtil = getIt<DeviceInfoUtil>();
+      return await deviceInfoUtil.getDeviceId();
+    } catch (e) {
+      print('⚠️ Error getting device ID: $e');
+      return 'fallback_device_id_${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
+
   void _startPeriodicCheck() {
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (_isChecking) return;
@@ -49,7 +63,7 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
       _checkCount++;
       if (mounted) setState(() {});
 
-      await _checkSubscriptionStatus();
+      await _login();
 
       if (_checkCount >= maxChecks) {
         timer.cancel();
@@ -65,12 +79,16 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
     });
   }
 
-  Future<void> _checkSubscriptionStatus() async {
+  Future<void> _login() async {
     if (_isChecking) return;
     setState(() => _isChecking = true);
+    final deviceId = await _getDeviceId();
 
     context.read<AuthBloc>().add(
-          CheckSubscriptionStatusEvent(email: widget.email),
+          LoginEvent(
+              email: widget.email,
+              password: widget.password,
+              deviceId: deviceId),
         );
 
     setState(() => _isChecking = false);
@@ -244,7 +262,7 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                   child: ElevatedButton.icon(
                     onPressed: (_isChecking || _checkCount >= maxChecks)
                         ? null
-                        : _checkSubscriptionStatus,
+                        : _login,
                     icon: _isChecking
                         ? const SizedBox(
                             width: 20,

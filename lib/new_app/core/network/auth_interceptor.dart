@@ -1,36 +1,34 @@
 // lib/core/network/auth_interceptor.dart
 
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import '../di/service_locator.dart';
+import '../storage/secure_storage.dart';
 
 class AuthInterceptor extends Interceptor {
-  final FlutterSecureStorage _secureStorage = getIt<FlutterSecureStorage>();
+  final SecureStorageService _secureStorage = getIt<SecureStorageService>();
 
   @override
   void onRequest(
-    RequestOptions options,
-    RequestInterceptorHandler handler,
-  ) async {
-    // Don't add token for login and register endpoints
+      RequestOptions options, RequestInterceptorHandler handler) async {
     final shouldSkipAuth = options.path.contains('/auth/login') ||
         options.path.contains('/auth/register');
+
+    options.headers['ngrok-skip-browser-warning'] = 'true';
+    options.headers['User-Agent'] = 'Mozilla/5.0';
 
     if (!shouldSkipAuth) {
       final token = await _secureStorage.read(key: StorageKeys.accessToken);
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
+
+      final deviceId = await _secureStorage.read(key: StorageKeys.deviceId);
+      if (deviceId != null && deviceId.isNotEmpty) {
+        options.headers['X-Device-Id'] = deviceId;
+      }
     }
 
     handler.next(options);
-  }
-
-  @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Don't handle token refresh here, let ErrorInterceptor handle it
-    // Just pass through
-    handler.next(err);
   }
 }

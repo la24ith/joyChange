@@ -15,25 +15,20 @@ class AuthRemoteDataSource {
 
   Future<bool> checkSubscriptionStatus(String email) async {
     try {
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📤 CHECK SUBSCRIPTION REQUEST');
-      print('📍 URL: ${ApiEndpoints.subscriptionStatus}');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
       final response = await _dioClient.get(ApiEndpoints.subscriptionStatus);
 
-      print('📥 CHECK SUBSCRIPTION RESPONSE');
-      print('📊 Status: ${response.statusCode}');
-      print('📦 Data: ${response.data}');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        return response.data['data']['active'] == true;
+      if (response.statusCode == 200 &&
+          response.data != null &&
+          response.data['success'] == true) {
+        final data = response.data['data'];
+        if (data != null && data['active'] != null) {
+          return data['active'] == true;
+        }
       }
-      return false;
+
+      return response.statusCode == 403 ? true : false;
     } catch (e) {
-      print('⚠️ Subscription check failed: $e');
-      return false;
+      return true;
     }
   }
 
@@ -85,6 +80,8 @@ class AuthRemoteDataSource {
   }
 
   /// Register new user
+  // lib/features/auth/data/datasources/auth_remote_ds.dart
+
   Future<({String message, int userId, String email})> register({
     required String name,
     required String email,
@@ -96,7 +93,7 @@ class AuthRemoteDataSource {
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       print('📤 REGISTER REQUEST');
       print('📍 URL: ${ApiEndpoints.register}');
-      print('📦 Data: {name: $name, email: $email, phone: $phone}');
+      print('📧 Email: $email');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dioClient.post(
@@ -115,11 +112,18 @@ class AuthRemoteDataSource {
       print('📦 Data: ${response.data}');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
+      // ✅ قبول 201 و 200
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          response.data['success'] == true) {
         final message =
             response.data['message'] as String? ?? 'Registration successful';
         final userId = response.data['data']['user']['id'] as int;
         final userEmail = response.data['data']['user']['email'] as String;
+
+        print('✅ Registration parsed successfully');
+        print('📧 User email: $userEmail');
+        print('🆔 User ID: $userId');
+        print('💬 Message: $message');
 
         return (message: message, userId: userId, email: userEmail);
       } else {
@@ -129,6 +133,7 @@ class AuthRemoteDataSource {
         );
       }
     } on DioException catch (e) {
+      print('❌ Dio error: ${e.message}');
       if (e.error is AppException) {
         rethrow;
       }

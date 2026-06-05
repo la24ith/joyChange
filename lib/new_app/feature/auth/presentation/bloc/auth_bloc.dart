@@ -2,7 +2,10 @@
 
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_session_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_subscription_usecase.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/register_usecase.dart';
 import '../../../../core/utils/device_info.dart';
 import '../../domain/repositories/auth_repository.dart';
 
@@ -13,6 +16,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
   final DeviceInfoUtil _deviceInfoUtil;
   final CheckSubscriptionUseCase _checkSubscriptionUseCase;
+  final CheckSessionUseCase _checkSessionUseCase;
+  final RegisterUseCase _registerUseCase;
 
   Timer? _pollingTimer;
   int _pollingCount = 0;
@@ -23,10 +28,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({
     required AuthRepository authRepository,
     required DeviceInfoUtil deviceInfoUtil,
+    required CheckSessionUseCase checkSessionUseCase,
     required CheckSubscriptionUseCase checkSubscriptionUseCase,
+    required RegisterUseCase registerUseCase,
   })  : _authRepository = authRepository,
         _deviceInfoUtil = deviceInfoUtil,
         _checkSubscriptionUseCase = checkSubscriptionUseCase,
+        _checkSessionUseCase =
+            CheckSessionUseCase(authRepository), // ✅ إنشاء الـ use case هنا
+        _registerUseCase = registerUseCase,
         super(const Unauthenticated()) {
     on<CheckSessionEvent>(_onCheckSession);
     on<LoginEvent>(_onLogin);
@@ -44,24 +54,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     return super.close();
   }
 
-  /// Check session when app starts
   Future<void> _onCheckSession(
     CheckSessionEvent event,
     Emitter<AuthState> emit,
   ) async {
-    final token = await _authRepository.getStoredToken();
+    emit(const LoginLoading());
 
-    if (token == null || token.isEmpty) {
-      emit(const Unauthenticated());
-      return;
-    }
+    final result = await _checkSessionUseCase();
 
-    final user = await _authRepository.getStoredUser();
-    if (user != null) {
-      emit(Authenticated(user: user, token: token));
-    } else {
-      emit(const Unauthenticated());
-    }
+    result.fold(
+      (failure) {
+        if (failure is SubscriptionExpiredFailure) {
+          emit(SubscriptionInactive(message: failure.message));
+        } else {
+          emit(Unauthenticated());
+        }
+      },
+      (user) {
+        // ✅ يوجد جلسة صالحة، انتقل مباشرة إلى Home
+        emit(Authenticated(
+          user: user,
+          token: '', // Token سيتم استرجاعه من الـ repository عند الحاجة
+        ));
+      },
+    );
   }
 
   /// Handle login
@@ -105,28 +121,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const LoginLoading());
 
-    final result = await _authRepository.register(
-      name: event.name,
-      email: event.email,
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📝 Registering user: ${event.email}');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    final result = await _registerUseCase(RegisterParams(
+      name: event.name.trim(),
+      email: event.email.trim(),
       password: event.password,
-      passwordConfirmation: event.password,
-      phone: event.phone,
-    );
+      phone: event.phone.trim(),
+    ));
 
     result.fold(
       (failure) {
+        print('❌ Registration failed: ${failure.message}');
         emit(AuthError(message: failure.message));
-        Future.delayed(const Duration(seconds: 2), () {
-          if (!isClosed) emit(const Unauthenticated());
-        });
       },
-      (response) {
+      (registerResult) {
+        print('✅ Registration successful!');
+        print('📧 Email: ${registerResult.email}');
+        print('🆔 UserId: ${registerResult.userId}');
+        print('💬 Message: ${registerResult.message}');
+
+        // ✅ الانتقال إلى حالة PendingSubscription
         emit(PendingSubscription(
-          message: response.message,
-          email: response.email,
-          userId: response.userId,
+          message: registerResult.message,
+          email: registerResult.email,
+          userId: registerResult.userId,
         ));
-        _startSubscriptionPolling(emit, response.email);
       },
     );
   }

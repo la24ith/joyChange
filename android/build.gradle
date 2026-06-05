@@ -25,9 +25,10 @@ buildscript {
     }
     
     dependencies {
-        // استخدم إصداراً متوافقاً مع مشروعك
-        // إذا كنت تريد 7.4.2 بالتحديد، تأكد من وجوده
+        
         classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath 'com.google.gms:google-services:4.4.4'  
+
         
         // تبعيات أخرى مثل:
     }

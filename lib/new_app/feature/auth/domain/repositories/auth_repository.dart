@@ -6,6 +6,8 @@ import '../entities/user.dart';
 import '../../data/models/login_response_model.dart';
 
 /// Response from register
+// lib/features/auth/domain/repositories/auth_repository.dart
+
 class RegisterResponse {
   final String message;
   final int userId;

@@ -11,11 +11,19 @@ sealed class HomeEvent extends Equatable {
 
 final class FetchPostsEvent extends HomeEvent {
   final int page;
+  final int limit;
 
-  const FetchPostsEvent({this.page = 1});
+  const FetchPostsEvent({this.page = 1, this.limit = 10});
 
   @override
-  List<Object?> get props => [page];
+  List<Object?> get props => [page, limit];
 }
+
+// ✅ حدث Prefetch جديد
+final class PrefetchPostsEvent extends HomeEvent {
+  const PrefetchPostsEvent();
+}
+
+final class FetchMorePostsEvent extends HomeEvent {}
 
 final class RefreshPostsEvent extends HomeEvent {}

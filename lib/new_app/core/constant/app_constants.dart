@@ -16,4 +16,6 @@ class AppConstants {
   // Cache Configuration
   static const int cacheMaxAgeDays = 7;
   static const int mediaCacheMaxSizeMB = 500;
+
+  String notificationsBox = 'notifications_box';
 }

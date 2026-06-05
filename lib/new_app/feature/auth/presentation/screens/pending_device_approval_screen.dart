@@ -10,11 +10,13 @@ import '../bloc/auth_state.dart';
 class PendingDeviceApprovalScreen extends StatefulWidget {
   final String message;
   final String email;
+  final String password;
 
   const PendingDeviceApprovalScreen({
     super.key,
     required this.message,
     required this.email,
+    required this.password,
   });
 
   @override
@@ -72,8 +74,9 @@ class _PendingDeviceApprovalScreenState
     final deviceId = await _getDeviceId();
 
     context.read<AuthBloc>().add(
-          CheckDeviceApprovalEvent(
+          LoginEvent(
             email: widget.email,
+            password: widget.password,
             deviceId: deviceId,
           ),
         );

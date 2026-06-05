@@ -32,23 +32,39 @@ class AuthRepositoryImpl implements AuthRepository {
         deviceId: deviceId,
       );
 
-      // If login successful, save token and user
-      if (response.success && response.token != null && response.user != null) {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📝 Login Response received');
+      print('✅ Success: ${response.success}');
+      print('🔑 Token present: ${response.token != null}');
+      if (response.token != null) {
+        print('🔑 Token: ${response.token!.substring(0, 20)}...');
+      }
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // ✅ تأكد من حفظ token
+      if (response.success &&
+          response.token != null &&
+          response.token!.isNotEmpty) {
         await localDataSource.saveToken(response.token!);
-        await localDataSource.saveUser(response.user!);
-        await localDataSource.saveUserEmail(email);
+        print('✅ Token saved to local storage');
+
+        // ✅ تحقق من أن token تم حفظه فعلاً
+        final savedToken = await localDataSource.getToken();
+        print(
+            '🔑 Retrieved saved token: ${savedToken != null ? "Yes (${savedToken.substring(0, 20)}...)" : "No"}');
+      } else {
+        print('❌ No token to save!');
       }
 
+      if (response.user != null) {
+        await localDataSource.saveUser(response.user!);
+        print('✅ User saved to local storage');
+      }
+      await localDataSource.saveDeviceId(deviceId);
       return Right(response);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
     } catch (e) {
-      return Left(UnknownFailure(
-        message: 'An unexpected error occurred: ${e.toString()}',
-      ));
+      print('❌ Login error: $e');
+      return Left(ServerFailure(message: e.toString()));
     }
   }
 
@@ -61,6 +77,11 @@ class AuthRepositoryImpl implements AuthRepository {
     required String phone,
   }) async {
     try {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📝 Register API call');
+      print('📧 Email: $email');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       final result = await remoteDataSource.register(
         name: name,
         email: email,
@@ -69,23 +90,31 @@ class AuthRepositoryImpl implements AuthRepository {
         phone: phone,
       );
 
+      print('✅ Register API success');
+      print('📧 User email: ${result.email}');
+      print('🆔 User ID: ${result.userId}');
+      print('💬 Message: ${result.message}');
+
       return Right(RegisterResponse(
         message: result.message,
         userId: result.userId,
         email: result.email,
       ));
     } on ServerException catch (e) {
+      print('❌ Server exception: ${e.message}');
       return Left(ServerFailure(
         message: e.message,
         statusCode: e.statusCode,
       ));
     } on BadRequestException catch (e) {
+      print('❌ Bad request: ${e.message}');
       return Left(ValidationFailure(
         message: e.message,
         errors: e.errors,
         statusCode: e.statusCode,
       ));
     } catch (e) {
+      print('❌ Unknown error: $e');
       return Left(UnknownFailure(
         message: 'An unexpected error occurred: ${e.toString()}',
       ));

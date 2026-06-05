@@ -39,7 +39,6 @@ dependencies:
   device_info_plus: ^9.1.2
   uuid: ^4.3.3
   package_info_plus: ^5.0.1
-  
   # Notifications
   firebase_messaging: ^14.7.19
   flutter_local_notifications: ^18.0.0
@@ -50,6 +49,7 @@ dependencies:
   # Security
   window_manager: ^0.5.1
   secure_application: ^4.1.0
+  screen_protector: ^1.4.2
   
   # Utilities
   intl: ^0.18.1
@@ -76,6 +76,17 @@ dependencies:
   confetti: ^0.7.0
   carousel_slider: ^5.1.2
   flutter_riverpod: ^2.6.1
+  get: ^4.7.3
+  flutter_markdown: ^0.7.7+1
+  visibility_detector: ^0.4.0+2
+  firebase_core: ^2.24.2
+  
+  
+  # Local Notifications
+  
+  # Notifications UI
+  timeago: ^3.6.0
+  share_plus: ^11.1.0
 dependency_overrides:
  
   web: ^0.5.1  # Force a compatible web version

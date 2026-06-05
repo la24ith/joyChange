@@ -2,6 +2,7 @@
 
 import 'package:dio/dio.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/app_constants.dart';
 import 'auth_interceptor.dart';
 import 'error_interceptor.dart';
 import 'subscription_interceptor.dart';
@@ -16,47 +17,49 @@ class DioClient {
     _dio = _createDio();
     _setupInterceptors();
   }
-
   Dio _createDio() {
-    print('✅ Using base URL: ${ApiEndpoints.baseUrl}');
+    String baseUrl = AppConstants.baseUrl;
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 1);
+    }
 
     return Dio(
       BaseOptions(
-        baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(seconds: 30),
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 60),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'User-Agent': 'Mozilla/5.0',
         },
-        validateStatus: (status) {
-          // Accept all status codes to handle them in interceptors
-          return status != null && status < 500;
-        },
+        validateStatus: (status) => true,
       ),
     );
   }
+  // lib/core/network/dio_client.dart
 
   void _setupInterceptors() {
     _dio.interceptors.clear();
-    _dio.interceptors.add(AuthInterceptor());
-    _dio.interceptors.add(SubscriptionInterceptor());
-    _dio.interceptors.add(ErrorInterceptor());
 
-    // Add logging interceptor for development
-    if (const bool.fromEnvironment('dart.vm.product') == false) {
-      _dio.interceptors.add(
-        LogInterceptor(
-          request: true,
-          requestHeader: true,
-          requestBody: true,
-          responseHeader: true,
-          responseBody: true,
-          error: true,
-        ),
-      );
-    }
+    // ✅ أضف logging interceptor أولاً
+    _dio.interceptors.add(
+      LogInterceptor(
+        request: true,
+        requestHeader: true,
+        requestBody: true,
+        responseHeader: true,
+        responseBody: true,
+        error: true,
+        logPrint: (obj) => print('🌐 DIO: $obj'),
+      ),
+    );
+
+    // ✅ AuthInterceptor (الذي يستخدم SecureStorageService)
+    _dio.interceptors.add(AuthInterceptor());
+    _dio.interceptors.add(ErrorInterceptor());
   }
 
   // Getters for HTTP methods

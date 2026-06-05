@@ -3,6 +3,8 @@ plugins {
     id "kotlin-android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
+    id 'com.google.gms.google-services'  // ✅ أضف هذا
+
 }
 
 android {
@@ -12,12 +14,12 @@ android {
 
     compileOptions {
            coreLibraryDesugaringEnabled true
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = JavaVersion.VERSION_17
     }
 
     defaultConfig {
@@ -47,4 +49,7 @@ flutter {
 dependencies {
     implementation "androidx.core:core-ktx:1.12.0"
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+    implementation platform('com.google.firebase:firebase-bom:34.13.0')  
+    implementation 'com.google.firebase:firebase-analytics' 
+    implementation 'com.google.firebase:firebase-messaging' 
 }

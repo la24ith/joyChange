@@ -4,13 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_strings.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/register_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subscription_expired_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/custom_text_field.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/gradient_button.dart';
+import 'package:joy_of_change_v3/new_app/feature/navigation/navigation_screen.dart';
 import '../../../../core/di/service_locator.dart';
-
+import 'package:get/get.dart';
 import '../../../../core/utils/device_info.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -126,24 +128,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
           if (state is Authenticated) {
             _showSnackBar('تم تسجيل الدخول بنجاح', isError: false);
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) {
-                widget.onLoginSuccess?.call();
-                Navigator.pushReplacementNamed(context, '/home');
-              }
-            });
+            Get.offAll(() => const NavigationScreen());
           } else if (state is PendingSubscription) {
             _showSnackBar(state.message, isError: false);
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PendingSubscriptionScreen(
-                      message: state.message,
-                      email: state.email,
-                      userId: state.userId,
-                    ),
+                Get.to(
+                  () => PendingSubscriptionScreen(
+                    message: state.message,
+                    email: state.email,
+                    userId: state.userId,
+                    password: _passwordController.text.trim(),
                   ),
                 );
               }
@@ -152,26 +147,19 @@ class _LoginScreenState extends State<LoginScreen> {
             _showSnackBar(state.message, isError: true);
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SubscriptionExpiredScreen(),
-                  ),
-                );
+                Get.offAll(() => const SubscriptionExpiredScreen());
+                ;
               }
             });
           } else if (state is PendingDeviceApproval) {
             _showSnackBar(state.message, isError: false);
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) {
-                Navigator.pushReplacementNamed(
-                  context,
-                  '/pending-device',
-                  arguments: {
-                    'message': state.message,
-                    'email': state.email,
-                  },
-                );
+                Get.to(() => PendingDeviceApprovalScreen(
+                      message: state.message,
+                      email: state.email,
+                      password: _passwordController.text.trim(),
+                    ));
               }
             });
           } else if (state is InvalidCredentials) {
@@ -182,7 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
         },
         child: BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
-            // ✅ استخدم LoginLoading بدلاً من AuthLoading
             final bool isLoading = state is LoginLoading;
 
             return Container(
@@ -211,7 +198,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 40),
                         _buildFormSection(isLoading),
                         const SizedBox(height: 20),
-                        _buildDemoInfoSection(),
                       ],
                     ),
                   ),
@@ -368,8 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         TextButton(
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (context) => RegisterScreen())),
+          onPressed: () => Get.to(() => const RegisterScreen()),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
@@ -383,38 +368,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDemoInfoSection() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            color: Colors.red.shade700,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'نسخة تجريبية: test@example.com / 123456',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.red.shade800,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

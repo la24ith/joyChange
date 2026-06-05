@@ -23,4 +23,9 @@ class StorageKeys {
   // Cache Keys
   static const String cachedPosts = 'cached_posts';
   static const String cachedUser = 'cached_user';
+  static const String lastSyncTime = 'last_sync_time';
+  static const String isOfflineMode = 'is_offline_mode';
+  static const String pendingSyncCount = 'pending_sync_count';
+
+  // Shared Preferences Keys
 }
