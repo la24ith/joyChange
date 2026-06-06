@@ -34,8 +34,8 @@ class AdCarousel extends StatelessWidget {
               height: screenHeight * 0.22,
               autoPlay: true,
               autoPlayInterval: const Duration(seconds: 5),
-              enlargeCenterPage: true,
-              viewportFraction: 0.9,
+              enlargeCenterPage: false,
+              viewportFraction: 1,
               enableInfiniteScroll: topAds.length > 1,
             ),
             itemBuilder: (context, index, realIndex) {

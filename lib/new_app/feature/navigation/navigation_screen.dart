@@ -9,6 +9,8 @@ import 'package:joy_of_change_v3/new_app/feature/daily_commitment/presentation/s
 import 'package:joy_of_change_v3/new_app/feature/darwer/presentation/bloc/drawer_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/presentation/bloc/drawer_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
+import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc/notifications_bloc.dart';
+import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc/notifications_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/screen/weight_screen.dart';
@@ -29,6 +31,9 @@ class NavigationScreen extends StatelessWidget {
         ),
         BlocProvider<DrawerBloc>.value(
           value: getIt<DrawerBloc>()..add(LoadUserSubscriptionEvent()),
+        ),
+        BlocProvider<NotificationBloc>(
+          create: (_) => getIt<NotificationBloc>()..add(SyncNotifications()),
         ),
       ],
       child: const _NavigationView(),
@@ -56,31 +61,6 @@ class _NavigationView extends StatelessWidget {
         label: 'السؤال اليومي',
         icon: Icons.question_mark,
         screen: DailyCommitmentScreen(),
-      ),
-      ModernNavigationItem(
-        label: 'الملف',
-        icon: Icons.person_outline,
-        screen: Scaffold(
-          body: GestureDetector(
-            onTap: () {},
-            child: Center(
-              child: ElevatedButton(
-                onPressed: () async {
-                  await getIt<NotificationSchedulerService>().showNow(
-                    NotificationHiveModel(
-                      id: 999,
-                      title: 'اختبار',
-                      message: 'هذا إشعار تجريبي',
-                      isRead: false,
-                      isScheduled: false,
-                    ),
-                  );
-                },
-                child: const Text('اختبار الإشعار'),
-              ),
-            ),
-          ),
-        ),
       ),
     ];
 

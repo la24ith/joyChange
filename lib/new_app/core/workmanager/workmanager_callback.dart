@@ -19,6 +19,6 @@ Future<void> registerNotificationSync() async {
   await Workmanager().registerPeriodicTask(
     'notification_sync_task',
     'notification_sync_task',
-    frequency: const Duration(hours: 6),
+    frequency: const Duration(minutes: 10),
   );
 }

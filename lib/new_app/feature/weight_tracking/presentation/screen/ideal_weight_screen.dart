@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/domain/entities/weight_goal_status.dart';
-import 'package:share_plus/share_plus.dart';
+//import 'package:share_plus/share_plus.dart';
 import 'dart:math' as math;
 
 import '../bloc/weight_bloc.dart';
@@ -424,7 +424,7 @@ class _IdealWeightPageState extends State<IdealWeightPage>
                             ),
                           ),
                           onPressed: () {
-                            Share.share('''
+                            /*       Share.share('''
 🎉 وصلت إلى هدفي في الوزن!
 
 الوزن الحالي: ${goal.formattedCurrentWeight}
@@ -434,6 +434,7 @@ ${goal.idealWeight != null ? 'الوزن المثالي: ${goal.idealWeight!.toS
 أنا فخور بإنجازي في رحلة اللياقة!
 #رحلة_التغيير #الوزن_المثالي
 ''');
+                     */
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber.shade600,

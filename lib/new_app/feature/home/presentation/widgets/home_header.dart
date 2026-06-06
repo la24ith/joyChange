@@ -2,17 +2,22 @@
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
+import 'package:joy_of_change_v3/new_app/core/widgets/animation_button.dart';
+import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/screens/notifications_screen.dart';
 
 class HomeHeader extends StatelessWidget {
   final String userName;
   final double? screenWidth;
-
+  final GlobalKey<ScaffoldState> scaffoldKey;
   const HomeHeader({
     super.key,
     required this.userName,
     this.screenWidth,
+    required this.scaffoldKey,
   });
 
   @override
@@ -28,6 +33,11 @@ class HomeHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          AnimatedMenuButton(
+            onTap: () {
+              scaffoldKey.currentState?.openDrawer();
+            },
+          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -50,21 +60,7 @@ class HomeHeader extends StatelessWidget {
           ),
           Row(
             children: [
-              _buildIconButton(
-                icon: Icons.notifications_outlined,
-                onTap: () {
-                  // TODO: Navigate to notifications
-                  Get.to(() => NotificationsPage());
-                },
-              ),
-              const SizedBox(width: 8),
-              _buildIconButton(
-                icon: Icons.settings_outlined,
-                onTap: () {
-                  // TODO: Navigate to settings
-                  // Get.to(()=> SettingsScreen());
-                },
-              ),
+              buildNotificationButton(),
             ],
           ),
         ],
@@ -97,6 +93,63 @@ class HomeHeader extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
       ),
+    );
+  }
+
+  Widget buildNotificationButton() {
+    final box = Hive.box<NotificationHiveModel>(
+      notificationsBox,
+    );
+
+    return ValueListenableBuilder(
+      valueListenable: box.listenable(),
+      builder: (context, Box<NotificationHiveModel> box, _) {
+        final unreadCount =
+            box.values.where((notification) => !notification.isRead).length;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_outlined,
+                size: 28,
+              ),
+              onPressed: () {
+                Get.to(() => const NotificationsPage());
+              },
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(
+                      12,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadCount > 99 ? '99+' : unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

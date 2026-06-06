@@ -148,15 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
       child: Scaffold(
         key: scaffoldKey,
-        appBar: AppBar(
-            title: const Text('الرئيسية'),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: AnimatedMenuButton(
-              onTap: () {
-                scaffoldKey.currentState?.openDrawer();
-              },
-            )),
         drawer: const AppDrawer(),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: BlocBuilder<AuthBloc, AuthState>(
@@ -177,6 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: HomeHeader(
                       userName: userName,
                       screenWidth: screenWidth,
+                      scaffoldKey: scaffoldKey,
                     ),
                   ),
 
@@ -200,17 +192,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: const AdCarousel(),
                     ),
                   ),
-
-                  if (_showIdealWeight)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: horizontalPadding,
-                        child: IdealWeightCard(
-                          onDismiss: () =>
-                              setState(() => _showIdealWeight = false),
-                        ),
-                      ),
-                    ),
 
                   SliverToBoxAdapter(
                     child: Padding(

@@ -25,7 +25,6 @@ import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_state.dart';
-import 'package:screen_protector/screen_protector.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +44,6 @@ void main() async {
       ?.requestNotificationsPermission();
   await registerNotificationSync();
   await setupServiceLocator();
-  await ScreenProtector.preventScreenshotOn();
 
   /// ✅ تهيئة Firebase بأمان (تجنب duplicate app)
 
@@ -83,8 +81,8 @@ class MyApp extends StatelessWidget {
         BlocProvider<HomeBloc>(
           create: (context) => getIt<HomeBloc>(),
         ),
-        BlocProvider<NotificationBloc>(
-          create: (_) => getIt<NotificationBloc>()
+        BlocProvider<NotificationBloc>.value(
+          value: getIt<NotificationBloc>()
             ..add(LoadNotifications())
             ..add(SyncNotifications()),
         ),
@@ -107,7 +105,7 @@ class MyApp extends StatelessWidget {
             return const IdealWeightSplashScreen();
           }
           // إذا لم يصل، يذهب مباشرة للشاشة الرئيسية
-          return const NavigationScreen();
+          return const SplashScreen();
         }),
         getPages: [
           GetPage(name: '/login', page: () => const LoginScreen()),

@@ -136,10 +136,12 @@ class _DrawerContent extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => const LogoutDialog(),
-    ).then((shouldLogout) {
-      if (shouldLogout == true && context.mounted) {
-        context.read<AuthBloc>().add(LogoutEvent());
-      }
-    },);
+    ).then(
+      (shouldLogout) {
+        if (shouldLogout == true && context.mounted) {
+          context.read<DrawerBloc>().add(LogoutRequestedEvent());
+        }
+      },
+    );
   }
 }
