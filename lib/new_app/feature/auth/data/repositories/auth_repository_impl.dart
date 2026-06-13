@@ -2,6 +2,7 @@
 
 import 'package:dartz/dartz.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/data/models/auth_state_model.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -179,5 +180,26 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<User?> getStoredUser() async {
     final userModel = await localDataSource.getCachedUser();
     return userModel?.toEntity();
+  }
+
+  @override
+  Future<Either<Failure, AuthStateModel>> checkAuthState({
+    required String email,
+    required String deviceId,
+    String? password,
+  }) async {
+    try {
+      final response = await remoteDataSource.checkAuthState(
+        email: email,
+        deviceId: deviceId,
+        password: password,
+      );
+      return Right(response);
+    } catch (e) {
+      print('❌ Check auth state error: $e');
+      return Left(ServerFailure(
+        message: 'Failed to check authentication state: ${e.toString()}',
+      ));
+    }
   }
 }

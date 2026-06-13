@@ -15,6 +15,7 @@ import 'package:joy_of_change_v3/new_app/feature/auth/data/datasources/auth_loca
 import 'package:joy_of_change_v3/new_app/feature/auth/data/datasources/auth_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/data/repositories/auth_repository_impl.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/repositories/auth_repository.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_auth_state_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_session_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_subscription_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/login_usecase.dart';
@@ -96,7 +97,9 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSource(dioClient: getIt<DioClient>()),
   );
-
+  getIt.registerLazySingleton<CheckAuthStateUseCase>(
+    () => CheckAuthStateUseCase(getIt<AuthRepository>()),
+  );
   getIt.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSource(
         secureStorage: getIt<SecureStorageService>(), userBox: userBox),

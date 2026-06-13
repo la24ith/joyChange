@@ -3,6 +3,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/utils/device_info.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/data/models/auth_state_model.dart';
+import '../../domain/usecases/check_auth_state_usecase.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -29,11 +33,17 @@ class _PendingDeviceApprovalScreenState
   Timer? _timer;
   int _checkCount = 0;
   bool _isChecking = false;
-  static const int maxChecks = 30; // 5 minutes
+  bool _autoLoginTriggered = false; // ✅ منع تكرار تسجيل الدخول
+
+  static const int maxChecks = 20; // 20 محاولة (حوالي 20 دقيقة)
+  static const int pollIntervalSeconds = 60; // كل 60 ثانية
+
+  late final CheckAuthStateUseCase _checkAuthStateUseCase;
 
   @override
   void initState() {
     super.initState();
+    _checkAuthStateUseCase = getIt<CheckAuthStateUseCase>();
     _startPeriodicCheck();
   }
 
@@ -43,50 +53,175 @@ class _PendingDeviceApprovalScreenState
     super.dispose();
   }
 
+  Future<String> _getDeviceId() async {
+    try {
+      final deviceInfoUtil = getIt<DeviceInfoUtil>();
+      return await deviceInfoUtil.getDeviceId();
+    } catch (e) {
+      print('⚠️ Error getting device ID: $e');
+      return 'fallback_device_id_${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
+
   void _startPeriodicCheck() {
-    _timer = Timer.periodic(const Duration(seconds: 10), (timer) async {
-      if (_isChecking) return;
+    _timer =
+        Timer.periodic(Duration(seconds: pollIntervalSeconds), (timer) async {
+      if (_isChecking || _autoLoginTriggered) return;
 
       _checkCount++;
       if (mounted) setState(() {});
 
       await _checkDeviceStatus();
 
-      if (_checkCount >= maxChecks) {
+      if (_checkCount >= maxChecks && mounted && !_autoLoginTriggered) {
         timer.cancel();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('انتهت مهلة الانتظار. يرجى تسجيل الدخول لاحقاً.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('انتهت مهلة الانتظار. يرجى تسجيل الدخول لاحقاً.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
     });
   }
 
   Future<void> _checkDeviceStatus() async {
-    if (_isChecking) return;
+    if (_isChecking || _autoLoginTriggered) return;
     setState(() => _isChecking = true);
 
-    // Get device ID from storage
-    final deviceId = await _getDeviceId();
+    try {
+      final deviceId = await _getDeviceId();
 
-    context.read<AuthBloc>().add(
-          LoginEvent(
-            email: widget.email,
-            password: widget.password,
-            deviceId: deviceId,
-          ),
-        );
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔄 Checking device approval (${_checkCount}/$maxChecks)');
+      print('📧 Email: ${widget.email}');
+      print('📱 Device ID: $deviceId');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    setState(() => _isChecking = false);
+      final result = await _checkAuthStateUseCase(
+        CheckAuthStateParams(
+          email: widget.email,
+          deviceId: deviceId,
+          password: widget.password,
+        ),
+      );
+
+      result.fold(
+        (failure) {
+          print('❌ Check auth state failed: ${failure.message}');
+          if (mounted && _checkCount % 3 == 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('خطأ في التحقق: ${failure.message}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+        (authState) {
+          print('✅ Auth state: ${authState.data.state}');
+          print('📊 Can access: ${authState.data.canAccess}');
+          print(
+              '📱 Device approved: ${authState.data.device?.isApproved ?? false}');
+
+          _handleAuthState(authState);
+        },
+      );
+    } catch (e) {
+      print('❌ Error checking device status: $e');
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
   }
 
-  Future<String> _getDeviceId() async {
-    // TODO: Get device ID from DeviceInfoUtil
-    return 'device_id_placeholder';
+  void _handleAuthState(AuthStateModel authState) {
+    final stateCode = authState.data.code;
+    final canAccess = authState.data.canAccess;
+    final isDeviceApproved = authState.data.device?.isApproved ?? false;
+
+    switch (stateCode) {
+      case 'UNAPPROVED_DEVICE':
+        // Still waiting for device approval
+        print('⏳ Still waiting for device approval...');
+        if (!isDeviceApproved) {
+          print('📱 Device approval status: pending');
+        }
+        break;
+
+      case 'ACTIVE':
+        // ✅ Device is approved! Full access granted
+        if (canAccess && isDeviceApproved && !_autoLoginTriggered) {
+          print('✅✅✅ DEVICE APPROVED! Auto-login to home...');
+          _timer?.cancel();
+          _autoLoginTriggered = true;
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ تم تفعيل جهازك! جاري تسجيل الدخول...'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+
+            _performAutoLogin();
+          }
+        }
+        break;
+
+      case 'NEEDS_SUBSCRIPTION':
+      case 'SUBSCRIPTION_INACTIVE':
+        // Subscription became inactive? This shouldn't happen, but handle it
+        if (!_autoLoginTriggered) {
+          print('⚠️ Subscription inactive while waiting for device approval');
+          _timer?.cancel();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('انتهت صلاحية الاشتراك. يرجى التواصل مع الدعم.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            _logout();
+          }
+        }
+        break;
+
+      default:
+        print('⚠️ Unknown state: $stateCode');
+    }
+  }
+
+  Future<void> _performAutoLogin() async {
+    try {
+      final deviceId = await _getDeviceId();
+
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔐 Device approved! Performing auto-login');
+      print('📧 Email: ${widget.email}');
+      print('📱 Device ID: $deviceId');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (mounted) {
+        context.read<AuthBloc>().add(
+              LoginEvent(
+                email: widget.email,
+                password: widget.password,
+                deviceId: deviceId,
+              ),
+            );
+      }
+    } catch (e) {
+      print('❌ Auto-login error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تسجيل الدخول: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -100,21 +235,25 @@ class _PendingDeviceApprovalScreenState
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Authenticated) {
+            // ✅ Login successful! Navigate to home
+            print('✅✅✅ Auto-login successful! Navigating to home...');
             _timer?.cancel();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ تم تفعيل جهازك! جاري تسجيل الدخول...'),
-                backgroundColor: Colors.green,
-              ),
-            );
+
+            // Save user data already handled by AuthRepositoryImpl
+            // Navigate to home
             Navigator.pushReplacementNamed(context, '/home');
           } else if (state is AuthError) {
+            print('❌ Auth error: ${state.message}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Colors.red,
               ),
             );
+
+            // If auto-login failed, reset flag
+            _autoLoginTriggered = false;
+            setState(() {});
           }
         },
         child: SafeArea(
@@ -237,7 +376,7 @@ class _PendingDeviceApprovalScreenState
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'سيتم تفعيل جهازك قريباً من قبل المشرف.\nيمكنك متابعة الحالة يدوياً بالضغط على زر التحقق.',
+                          'سيتم تفعيل جهازك قريباً من قبل المشرف.\nسيتم تسجيل الدخول تلقائياً عند التفعيل.',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.amber.shade800,
@@ -255,7 +394,7 @@ class _PendingDeviceApprovalScreenState
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
-                    onPressed: (_isChecking || _checkCount >= maxChecks)
+                    onPressed: (_isChecking || _autoLoginTriggered)
                         ? null
                         : _checkDeviceStatus,
                     icon: _isChecking

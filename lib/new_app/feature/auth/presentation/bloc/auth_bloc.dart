@@ -81,6 +81,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   /// Handle login
+  // في auth_bloc.dart - دالة _onLogin
+
   Future<void> _onLogin(
     LoginEvent event,
     Emitter<AuthState> emit,
@@ -96,19 +98,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     result.fold(
       (failure) {
         emit(AuthError(message: failure.message));
-        Future.delayed(const Duration(seconds: 2), () {
-          if (!isClosed) emit(const Unauthenticated());
-        });
+        // ✅ إزالة Future.delayed من هنا
+        // بدلاً من ذلك، يمكن إضافة حدث لمسح الخطأ
+        add(ClearAuthErrorEvent()); // استخدم add بدلاً من emit
       },
       (response) {
         final state = response.toAuthState();
         emit(state);
 
-        // Start polling if needed
+        // ✅ لا تستخدم Future.delayed مع emit أبداً
         if (state is PendingSubscription) {
-          _startSubscriptionPolling(emit, state.email);
+          // أضف حدثاً لبدء Polling بدلاً من استدعاء دالة مباشرة
+          add(StartSubscriptionPollingEvent(email: state.email));
         } else if (state is PendingDeviceApproval) {
-          _startDevicePolling(emit, state.email, event.deviceId);
+          add(StartDevicePollingEvent(
+              email: state.email, deviceId: event.deviceId));
         }
       },
     );

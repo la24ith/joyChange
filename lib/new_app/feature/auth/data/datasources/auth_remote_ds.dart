@@ -6,6 +6,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../models/login_response_model.dart';
 import '../models/user_model.dart';
+import '../models/auth_state_model.dart';
 
 class AuthRemoteDataSource {
   final DioClient _dioClient;
@@ -137,6 +138,58 @@ class AuthRemoteDataSource {
       if (e.error is AppException) {
         rethrow;
       }
+      throw ServerException(
+        message: 'Network error: ${e.message}',
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  /// Check auth state (subscription + device approval status)
+  /// This endpoint doesn't require password, only email and device_id
+  Future<AuthStateModel> checkAuthState({
+    required String email,
+    required String deviceId,
+    String? password,
+  }) async {
+    try {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📤 CHECK AUTH STATE REQUEST');
+      print('📍 URL: ${ApiEndpoints.authState}');
+      print('📧 Email: $email');
+      print('📱 Device ID: $deviceId');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      final Map<String, dynamic> requestData = {
+        'email': email,
+        'device_id': deviceId,
+      };
+
+      // Add password if provided (optional)
+      if (password != null && password.isNotEmpty) {
+        requestData['password'] = password;
+      }
+
+      final response = await _dioClient.post(
+        ApiEndpoints.authState,
+        data: requestData,
+      );
+
+      print('📥 CHECK AUTH STATE RESPONSE');
+      print('📊 Status: ${response.statusCode}');
+      print('📦 Data: ${response.data}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (response.statusCode == 200) {
+        return AuthStateModel.fromJson(response.data);
+      } else {
+        throw ServerException(
+          message: response.data['message'] ?? 'Failed to check auth state',
+          statusCode: response.statusCode,
+        );
+      }
+    } on DioException catch (e) {
+      print('❌ DIO ERROR: ${e.message}');
       throw ServerException(
         message: 'Network error: ${e.message}',
         statusCode: e.response?.statusCode,

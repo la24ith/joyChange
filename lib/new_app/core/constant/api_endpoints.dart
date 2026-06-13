@@ -14,7 +14,7 @@ class ApiEndpoints {
   static const String profile = '/api/auth/profile';
   static const String changePassword = '/api/auth/change-password';
   static const String subscriptionStatus = '/api/auth/subscription-status';
-
+  static const String authState = '/api/auth/state';
   // Full URL getters
   static String get fullRegister => '$baseUrl$register';
   static String get fullLogin => '$baseUrl$login';

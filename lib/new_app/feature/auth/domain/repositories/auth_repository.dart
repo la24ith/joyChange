@@ -4,6 +4,7 @@ import 'package:dartz/dartz.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
 import '../entities/user.dart';
 import '../../data/models/login_response_model.dart';
+import '../../data/models/auth_state_model.dart';
 
 /// Response from register
 // lib/features/auth/domain/repositories/auth_repository.dart
@@ -61,4 +62,12 @@ abstract class AuthRepository {
 
   /// Get stored user
   Future<User?> getStoredUser();
+
+  /// Check authentication state (subscription + device approval)
+  /// Returns AuthStateModel with current state: NEEDS_SUBSCRIPTION, DEVICE_PENDING_APPROVAL, ACTIVE
+  Future<Either<Failure, AuthStateModel>> checkAuthState({
+    required String email,
+    required String deviceId,
+    String? password,
+  });
 }

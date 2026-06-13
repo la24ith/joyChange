@@ -42,6 +42,8 @@ class _DrawerContent extends StatelessWidget {
     return BlocListener<DrawerBloc, DrawerState>(
       listener: (context, state) {
         if (state is DrawerLogoutSuccess) {
+          // ✅ تسجيل الخروج من AuthBloc أيضاً
+          context.read<AuthBloc>().add(LogoutEvent());
           context.go('/login');
         }
         if (state is DrawerError) {
@@ -73,45 +75,50 @@ class _DrawerContent extends StatelessWidget {
               Expanded(
                 child: BlocBuilder<DrawerBloc, DrawerState>(
                   builder: (context, state) {
+                    // الحصول على العنصر المختار من الحالة
+                    MenuItem selectedItem = MenuItem.home;
                     if (state is DrawerLoaded) {
-                      return ListView(
-                        padding: EdgeInsets.zero,
-                        children: [
-                          DrawerMenuItem(
-                            item: MenuItem.home,
-                            isSelected: state.selectedItem == MenuItem.home,
-                            onTap: () =>
-                                _navigateToPage(context, MenuItem.home),
-                          ),
-                          DrawerMenuItem(
-                            item: MenuItem.weights,
-                            isSelected: state.selectedItem == MenuItem.weights,
-                            onTap: () =>
-                                _navigateToPage(context, MenuItem.weights),
-                          ),
-                          const Divider(height: 24, thickness: 1),
-                          DrawerMenuItem(
-                            item: MenuItem.diabetes,
-                            isSelected: state.selectedItem == MenuItem.diabetes,
-                            onTap: () =>
-                                _navigateToPage(context, MenuItem.diabetes),
-                          ),
-                          DrawerMenuItem(
-                            item: MenuItem.cubs,
-                            isSelected: state.selectedItem == MenuItem.cubs,
-                            onTap: () =>
-                                _navigateToPage(context, MenuItem.cubs),
-                          ),
-                          const Divider(height: 24, thickness: 1),
-                          DrawerMenuItem(
-                            item: MenuItem.logout,
-                            isSelected: false,
-                            onTap: () => _showLogoutDialog(context),
-                          ),
-                        ],
-                      );
+                      selectedItem = state.selectedItem;
+                    } else if (state is DrawerLoadingWithCache) {
+                      selectedItem = state.selectedItem;
                     }
-                    return const SizedBox.shrink();
+
+                    return ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        DrawerMenuItem(
+                            item: MenuItem.home,
+                            isSelected: selectedItem == MenuItem.home,
+                            onTap: () {}
+                            //    _navigateToPage(context, MenuItem.home),
+                            ),
+                        DrawerMenuItem(
+                            item: MenuItem.weights,
+                            isSelected: selectedItem == MenuItem.weights,
+                            onTap: () => {}
+                            //  _navigateToPage(context, MenuItem.weights),
+                            ),
+                        const Divider(height: 24, thickness: 1),
+                        DrawerMenuItem(
+                            item: MenuItem.diabetes,
+                            isSelected: selectedItem == MenuItem.diabetes,
+                            onTap: () {}
+                            //    _navigateToPage(context, MenuItem.diabetes),
+                            ),
+                        DrawerMenuItem(
+                            item: MenuItem.cubs,
+                            isSelected: selectedItem == MenuItem.cubs,
+                            onTap: () {}
+                            //   _navigateToPage(context, MenuItem.cubs),
+                            ),
+                        const Divider(height: 24, thickness: 1),
+                        DrawerMenuItem(
+                          item: MenuItem.logout,
+                          isSelected: false,
+                          onTap: () => _showLogoutDialog(context),
+                        ),
+                      ],
+                    );
                   },
                 ),
               ),
@@ -122,14 +129,20 @@ class _DrawerContent extends StatelessWidget {
     );
   }
 
+  // ✅ تفعيل Navigation
   void _navigateToPage(BuildContext context, MenuItem item) {
     if (item == MenuItem.logout) return;
 
-    //   context.read<DrawerBloc>().add(SelectMenuItemEvent(selectedItem: item));
-    // context.push(item.route);
-    //if (context.mounted) {
-    //Navigator.pop(context);
-    //}
+    // تحديث العنصر المختار في الـ Bloc
+    context.read<DrawerBloc>().add(SelectMenuItemEvent(selectedItem: item));
+
+    // الانتقال إلى الصفحة المطلوبة
+    context.push(item.route);
+
+    // إغلاق الـ Drawer بعد التنقل
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
   }
 
   void _showLogoutDialog(BuildContext context) {

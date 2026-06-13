@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:joy_of_change_v3/new_app/feature/darwer/domain/entities/user_subscription.dart';
+import 'package:joy_of_change_v3/new_app/feature/darwer/presentation/bloc/drawer_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/presentation/bloc/drawer_state.dart';
 
 import '../bloc/drawer_bloc.dart';
@@ -40,106 +42,170 @@ class DrawerHeader extends StatelessWidget {
       ),
       child: BlocBuilder<DrawerBloc, DrawerState>(
         builder: (context, state) {
+          // ✅ حالة البيانات محملة بالكامل
           if (state is DrawerLoaded) {
-            final subscription = state.subscription;
+            return _buildHeaderContent(state.subscription);
+          }
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // ✅ حالة التحميل مع بيانات Cache - عرض بيانات سابقة مع مؤشر تحميل
+          if (state is DrawerLoadingWithCache &&
+              state.cachedSubscription != null) {
+            return Stack(
               children: [
-                // Avatar
-                Center(
+                // عرض البيانات المخزنة
+                _buildHeaderContent(state.cachedSubscription!),
+                // تراكب شفاف مع مؤشر تحميل
+                Positioned.fill(
                   child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
+                    color: Colors.black.withOpacity(0.3),
+                    child: const Center(
+                      child: CircularProgressIndicator(
                         color: Colors.white,
-                        width: 3,
+                        strokeWidth: 2,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: subscription.avatarUrl != null &&
-                              subscription.avatarUrl!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: subscription.avatarUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                color: Colors.white.withOpacity(0.2),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (_, __, ___) => Container(
-                                color: Colors.white.withOpacity(0.2),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 40,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: Colors.white.withOpacity(0.2),
-                              child: const Icon(
-                                Icons.person,
-                                size: 40,
-                                color: Colors.white,
-                              ),
-                            ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // User Name
-                Text(
-                  subscription.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                // User Email
-                Text(
-                  subscription.email,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                // Subscription Status
-                SubscriptionStatus(
-                  statusText: subscription.statusText,
-                  statusColor: subscription.statusColor,
                 ),
               ],
             );
           }
 
+          // ✅ حالة تحميل بدون Cache (أول مرة)
           if (state is DrawerLoading) {
             return const Center(
               child: CircularProgressIndicator(color: Colors.white),
             );
           }
 
+          // ✅ حالة خطأ
+          if (state is DrawerError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'حدث خطأ في تحميل البيانات',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      context
+                          .read<DrawerBloc>()
+                          .add(LoadUserSubscriptionEvent());
+                    },
+                    child: const Text(
+                      'إعادة المحاولة',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return const SizedBox.shrink();
         },
       ),
+    );
+  }
+
+  Widget _buildHeaderContent(UserSubscription subscription) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Avatar
+        Center(
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white,
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: subscription.avatarUrl != null &&
+                      subscription.avatarUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: subscription.avatarUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        color: Colors.white.withOpacity(0.2),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        color: Colors.white.withOpacity(0.2),
+                        child: const Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.white.withOpacity(0.2),
+                      child: const Icon(
+                        Icons.person,
+                        size: 40,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // User Name
+        Text(
+          subscription.name,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        // User Email
+        Text(
+          subscription.email,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white.withOpacity(0.8),
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        // Subscription Status
+        SubscriptionStatus(
+          statusText: subscription.statusText,
+          statusColor: subscription.statusColor,
+        ),
+      ],
     );
   }
 }

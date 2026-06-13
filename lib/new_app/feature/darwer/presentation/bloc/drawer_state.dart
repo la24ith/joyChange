@@ -1,6 +1,5 @@
 // lib/features/drawer/presentation/bloc/drawer_state.dart
 import 'package:joy_of_change_v3/new_app/feature/darwer/data/models/drawer_models.dart';
-
 import 'package:equatable/equatable.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/domain/entities/user_subscription.dart';
 
@@ -14,6 +13,20 @@ abstract class DrawerState extends Equatable {
 class DrawerInitial extends DrawerState {}
 
 class DrawerLoading extends DrawerState {}
+
+// ✅ جديد: حالة تحميل مع بيانات سابقة (Cache)
+class DrawerLoadingWithCache extends DrawerState {
+  final UserSubscription? cachedSubscription;
+  final MenuItem selectedItem;
+
+  const DrawerLoadingWithCache({
+    this.cachedSubscription,
+    this.selectedItem = MenuItem.home,
+  });
+
+  @override
+  List<Object?> get props => [cachedSubscription, selectedItem];
+}
 
 class DrawerLoaded extends DrawerState {
   final UserSubscription subscription;

@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/utils/device_info.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/data/models/auth_state_model.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
+import '../../domain/usecases/check_auth_state_usecase.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -32,11 +35,17 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
   Timer? _timer;
   int _checkCount = 0;
   bool _isChecking = false;
-  static const int maxChecks = 30; // 5 minutes
+  bool _autoLoginTriggered = false; // ✅ منع تكرار تسجيل الدخول
+
+  static const int maxChecks = 20; // 20 محاولة (حوالي 20 دقيقة)
+  static const int pollIntervalSeconds = 60; // كل 60 ثانية
+
+  late final CheckAuthStateUseCase _checkAuthStateUseCase;
 
   @override
   void initState() {
     super.initState();
+    _checkAuthStateUseCase = getIt<CheckAuthStateUseCase>();
     _startPeriodicCheck();
   }
 
@@ -57,41 +66,146 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
   }
 
   void _startPeriodicCheck() {
-    _timer = Timer.periodic(const Duration(seconds: 10), (timer) async {
-      if (_isChecking) return;
+    _timer =
+        Timer.periodic(Duration(seconds: pollIntervalSeconds), (timer) async {
+      if (_isChecking || _autoLoginTriggered) return;
 
       _checkCount++;
       if (mounted) setState(() {});
 
-      await _login();
+      await _checkAuthState();
 
-      if (_checkCount >= maxChecks) {
+      if (_checkCount >= maxChecks && mounted && !_autoLoginTriggered) {
         timer.cancel();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('انتهت مهلة الانتظار. يرجى تسجيل الدخول لاحقاً.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'انتهت مهلة الانتظار. يرجى تسجيل الدخول لاحقاً أو التواصل مع الدعم.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
       }
     });
   }
 
-  Future<void> _login() async {
-    if (_isChecking) return;
+  Future<void> _checkAuthState() async {
+    if (_isChecking || _autoLoginTriggered) return;
     setState(() => _isChecking = true);
-    final deviceId = await _getDeviceId();
 
-    context.read<AuthBloc>().add(
-          LoginEvent(
-              email: widget.email,
-              password: widget.password,
-              deviceId: deviceId),
+    try {
+      final deviceId = await _getDeviceId();
+
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔄 Checking auth state (${_checkCount}/$maxChecks)');
+      print('📧 Email: ${widget.email}');
+      print('📱 Device ID: $deviceId');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      final result = await _checkAuthStateUseCase(
+        CheckAuthStateParams(
+          email: widget.email,
+          deviceId: deviceId,
+          password: widget.password,
+        ),
+      );
+
+      result.fold(
+        (failure) {
+          print('❌ Check auth state failed: ${failure.message}');
+        },
+        (authState) {
+          print('✅ Auth state: ${authState.data.state}');
+          print('📊 Code: ${authState.data.code}');
+
+          _handleAuthState(authState);
+        },
+      );
+    } catch (e) {
+      print('❌ Error checking auth state: $e');
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  void _handleAuthState(AuthStateModel authState) {
+    final stateCode = authState.data.code;
+
+    switch (stateCode) {
+      case 'SUBSCRIPTION_INACTIVE':
+      case 'NEEDS_SUBSCRIPTION':
+        // Still waiting for subscription activation
+        print('⏳ Still waiting for subscription activation...');
+        break;
+
+      case 'UNAPPROVED_DEVICE':
+        // ✅ Subscription is active! Need to login to register device with admin
+        if (!_autoLoginTriggered) {
+          print(
+              '✅ Subscription activated! Triggering auto-login to register device...');
+          _timer?.cancel();
+          _autoLoginTriggered = true;
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ تم تفعيل الاشتراك! جاري تسجيل الدخول...'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+
+            // ✅ Auto-login to register device with admin
+            _performAutoLogin();
+          }
+        }
+        break;
+
+      case 'ACTIVE':
+        // ✅ Fully active! Device is already approved
+        if (!_autoLoginTriggered) {
+          print('✅ Already active! Auto-login to home...');
+          _timer?.cancel();
+          _autoLoginTriggered = true;
+          _performAutoLogin();
+        }
+        break;
+
+      default:
+        print('⚠️ Unknown state: $stateCode');
+    }
+  }
+
+  Future<void> _performAutoLogin() async {
+    try {
+      final deviceId = await _getDeviceId();
+
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔐 Performing auto-login');
+      print('📧 Email: ${widget.email}');
+      print('📱 Device ID: $deviceId');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (mounted) {
+        context.read<AuthBloc>().add(
+              LoginEvent(
+                email: widget.email,
+                password: widget.password,
+                deviceId: deviceId,
+              ),
+            );
+      }
+    } catch (e) {
+      print('❌ Auto-login error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تسجيل الدخول: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
-
-    setState(() => _isChecking = false);
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -105,21 +219,40 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Authenticated) {
+            // ✅ Login successful - navigate based on state
+            print('✅ Auto-login successful! User is authenticated');
             _timer?.cancel();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ تم تفعيل اشتراكك! جاري تسجيل الدخول...'),
-                backgroundColor: Colors.green,
+
+            // Navigate to home (the home screen will handle redirection if needed)
+            Navigator.pushReplacementNamed(context, '/home');
+          } else if (state is PendingDeviceApproval) {
+            // ✅ Navigate to device approval screen
+            print(
+                '📱 Device pending approval - navigating to device approval screen');
+            _timer?.cancel();
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PendingDeviceApprovalScreen(
+                  message: state.message,
+                  email: state.email,
+                  password: widget.password,
+                ),
               ),
             );
-            Navigator.pushReplacementNamed(context, '/home');
           } else if (state is AuthError) {
+            print('❌ Auth error: ${state.message}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Colors.red,
               ),
             );
+
+            // If auto-login failed, reset flag
+            _autoLoginTriggered = false;
+            setState(() {});
           }
         },
         child: SafeArea(
@@ -242,7 +375,7 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'سيتم تفعيل اشتراكك قريباً من قبل المشرف.\nيمكنك متابعة الحالة يدوياً بالضغط على زر التحقق.',
+                          'سيتم تفعيل اشتراكك قريباً من قبل المشرف.\nسيتم تسجيل الدخول تلقائياً عند التفعيل.',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.amber.shade800,
@@ -260,9 +393,9 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
-                    onPressed: (_isChecking || _checkCount >= maxChecks)
+                    onPressed: (_isChecking || _autoLoginTriggered)
                         ? null
-                        : _login,
+                        : _checkAuthState,
                     icon: _isChecking
                         ? const SizedBox(
                             width: 20,

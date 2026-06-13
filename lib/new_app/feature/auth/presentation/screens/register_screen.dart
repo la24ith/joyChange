@@ -79,12 +79,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               print('🎯 Navigating to PendingSubscriptionScreen');
               _showSnackBar(state.message, isError: false);
               if (mounted) {
+                // ✅ تأكد من تمرير الـ password
                 Get.to(
                   () => PendingSubscriptionScreen(
                     message: state.message,
                     email: state.email,
                     userId: state.userId,
-                    password: password,
+                    password:
+                        _passwordController.text.trim(), // ✅ تأكد من وجود هذا
                   ),
                 );
               }

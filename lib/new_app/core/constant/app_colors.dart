@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  //static const Color primaryLight = Color(0xFF4DB6AC);
-  static const Color gradientStart = Color(0xFFE8F5E9);
-  static const Color gradientMiddle = Color(0xFFB2DFDB);
-  static const Color gradientEnd = Color(0xFF80CBC4);
-  // static const Color error = Color(0xFFD32F2F);
-  // static const Color success = Color(0xFF388E3C);
-  // static const Color warning = Color(0xFFFFA000);
-  // Primary Colors
-  static const Color primary = Color(0xFF6366F1); // Soft Purple
-  static const Color primaryLight = Color(0xFF818CF8);
-  static const Color primaryDark = Color(0xFF4F46E5);
+  // ========== ألوان العميل الجديدة ==========
+  static const Color clientYellow = Color(0xFFFCD943); // #fcd943
+  static const Color clientOrange = Color(0xFFF5A841); // #f5a841
+  static const Color clientTeal = Color(0xFF239CA9); // #239ca9
 
-  // Secondary Colors
-  static const Color secondary = Color(0xFF8B5CF6); // Purple
-  static const Color accent = Color(0xFF06B6D4); // Cyan
+  // ========== الألوان الأساسية المعاد تعيينها ==========
+  // Primary (باستخدام اللون الفيروزي)
+  static const Color primary = Color(0xFF239CA9); // clientTeal
+  static const Color primaryLight = Color(0xFF4FB3C2); // أفتح قليلاً
+  static const Color primaryDark = Color(0xFF1A7A85); // أغمق قليلاً
 
+  // Secondary (باستخدام اللون البرتقالي)
+  static const Color secondary = Color(0xFFF5A841); // clientOrange
+  static const Color accent = Color(0xFFFCD943); // clientYellow
+
+  // Gradient (تدرج لوني يجمع ألوان العميل)
+  static const Color gradientStart = Color(0xFFFCD943); // أصفر
+  static const Color gradientMiddle = Color(0xFFF5A841); // برتقالي
+  static const Color gradientEnd = Color(0xFF239CA9); // فيروزي
+
+  // ========== الألوان المساعدة (تبقى كما هي أو تعدل قليلاً) ==========
   // Background Colors
   static const Color background = Color(0xFFF8FAFC);
   static const Color surface = Colors.white;
@@ -31,16 +36,15 @@ class AppColors {
   static const Color success = Color(0xFF10B981);
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
-  static const Color info = Color(0xFFF59E0B);
+  static const Color info =
+      Color(0xFF239CA9); // تعديل info ليتوافق مع اللون الأساسي
 
-//
-
+  // Light versions للاستخدام في الخلفيات
   static const Color successLight = Color(0xFFD1FAE5);
   static const Color warningLight = Color(0xFFFEF3C7);
-  static const Color accentWarm = Color(0xFFF59E0B);
-//static const Color gradientStart = Color(0xFF6366F1);
-//static const Color gradientEnd = Color(0xFF10B981);
-  // Shadows
+  static const Color accentWarm = Color(0xFFF5A841);
+
+  // ========== الظلال (تبقى كما هي) ==========
   static List<BoxShadow> softShadow = [
     BoxShadow(
       color: Colors.black.withOpacity(0.04),
