@@ -85,6 +85,7 @@ dependencies:
   
   # Notifications UI
   timeago: ^3.6.0
+  flutter_native_timezone: ^2.0.0
   #share_plus: ^11.1.0
 dependency_overrides:
  

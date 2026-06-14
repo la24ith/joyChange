@@ -1,43 +1,23 @@
+// feature/notifications/presentation/bloc/notifications_bloc.dart
 import 'dart:async';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/domain/entities/repository/notification_repository.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc/notifications_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc/notifications_state.dart';
-
 import '../../data/models/notification_hive_model.dart';
 
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationRepository repository;
-
   StreamSubscription? _notificationsSubscription;
   bool _isLoading = false;
-  NotificationBloc(
-    this.repository,
-  ) : super(NotificationInitial()) {
-    on<LoadNotifications>(
-      _onLoadNotifications,
-    );
 
-    on<SyncNotifications>(
-      _onSyncNotifications,
-    );
-
-    on<RefreshNotifications>(
-      _onRefreshNotifications,
-    );
-
-    on<MarkAllReadNotifications>(
-      _onMarkAllRead,
-    );
-
-    on<DeleteNotificationEvent>(
-      _onDeleteNotification,
-    );
-
-    on<NotificationsUpdated>(
-      _onNotificationsUpdated,
-    );
+  NotificationBloc(this.repository) : super(NotificationInitial()) {
+    on<LoadNotifications>(_onLoadNotifications);
+    on<SyncNotifications>(_onSyncNotifications);
+    on<RefreshNotifications>(_onRefreshNotifications);
+    on<MarkAllReadNotifications>(_onMarkAllRead);
+    on<DeleteNotificationEvent>(_onDeleteNotification);
+    on<NotificationsUpdated>(_onNotificationsUpdated);
   }
 
   Future<void> _onLoadNotifications(
@@ -50,21 +30,22 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
     _notificationsSubscription = repository.watchNotifications().listen(
       (notifications) {
-        add(
-          NotificationsUpdated(
-            notifications,
-          ),
-        );
+        if (!isClosed) {
+          add(NotificationsUpdated(notifications));
+        }
+      },
+      onError: (error) {
+        if (!isClosed) {
+          emit(NotificationError(error.toString()));
+        }
       },
     );
 
     final notifications = await repository.getNotifications();
 
-    emit(
-      NotificationLoaded(
-        notifications,
-      ),
-    );
+    if (!isClosed) {
+      emit(NotificationLoaded(notifications));
+    }
   }
 
   Future<void> _onSyncNotifications(
@@ -74,11 +55,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     try {
       await repository.syncNotifications();
     } catch (e) {
-      emit(
-        NotificationError(
-          e.toString(),
-        ),
-      );
+      if (!isClosed) {
+        emit(NotificationError(e.toString()));
+      }
     }
   }
 
@@ -86,9 +65,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     RefreshNotifications event,
     Emitter<NotificationState> emit,
   ) async {
-    add(
-      SyncNotifications(),
-    );
+    add(SyncNotifications());
   }
 
   Future<void> _onMarkAllRead(
@@ -101,13 +78,13 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     try {
       emit(MarkAllReadloading());
       await repository.markAllRead();
-      emit(MarkAllReadSuccesfuly());
+      if (!isClosed) {
+        emit(MarkAllReadSuccesfuly());
+      }
     } catch (e) {
-      emit(
-        NotificationError(
-          e.toString(),
-        ),
-      );
+      if (!isClosed) {
+        emit(NotificationError(e.toString()));
+      }
     } finally {
       _isLoading = false;
     }
@@ -118,15 +95,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      await repository.deleteNotification(
-        event.notificationId,
-      );
+      await repository.deleteNotification(event.notificationId);
     } catch (e) {
-      emit(
-        NotificationError(
-          e.toString(),
-        ),
-      );
+      if (!isClosed) {
+        emit(NotificationError(e.toString()));
+      }
     }
   }
 
@@ -134,17 +107,14 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     NotificationsUpdated event,
     Emitter<NotificationState> emit,
   ) async {
-    emit(
-      NotificationLoaded(
-        event.notifications,
-      ),
-    );
+    if (!isClosed) {
+      emit(NotificationLoaded(event.notifications));
+    }
   }
 
   @override
   Future<void> close() {
     _notificationsSubscription?.cancel();
-
     return super.close();
   }
 }

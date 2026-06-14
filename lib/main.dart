@@ -1,4 +1,4 @@
-// lib/main.dart - الكامل مع الحل
+// lib/main.dart
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,7 +13,7 @@ import 'package:joy_of_change_v3/new_app/core/services/timezone_service.dart';
 import 'package:joy_of_change_v3/new_app/core/workmanager/workmanager_callback.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_event.dart';
-import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_state.dart'; // ✅ تأكد من إضافة هذا
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_state.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/login_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/ideal_weight_splash_screen.dart';
@@ -29,36 +29,39 @@ import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bl
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ تهيئة Firebase بأمان
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
+
   await Hive.initFlutter();
 
   Hive.registerAdapter(NotificationHiveModelAdapter());
-  await Hive.deleteBoxFromDisk(
-    notificationsBox,
-  );
+
+  // ❌ إزالة هذا السطر - لا تحذف الـ Box
+  // await Hive.deleteBoxFromDisk(notificationsBox);
+
   await Hive.openBox<NotificationHiveModel>(notificationsBox);
+
   await TimezoneService.initialize();
+
   final notificationPlugin = await LocalNotificationInitializer.init();
   await notificationPlugin
       .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>()
       ?.requestNotificationsPermission();
+
   await registerNotificationSync();
   await setupServiceLocator();
 
-  /// ✅ تهيئة Firebase بأمان (تجنب duplicate app)
-
-  Future<void> _initializeFirebase() async {
-    try {
-      // التحقق مما إذا كان Firebase مهيأ مسبقاً
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      } else {}
-    } catch (e) {}
-  }
-
-  await _initializeFirebase();
+  // ✅ تخزين الـ plugin في service locator
+  getIt.registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
 
   runApp(const MyApp());
 }
@@ -73,7 +76,6 @@ class MyApp extends StatelessWidget {
         BlocProvider<AuthBloc>(
           create: (context) {
             final authBloc = getIt<AuthBloc>();
-            // ✅ التحقق من الجلسة عند بدء التطبيق
             authBloc.add(CheckSessionEvent());
             return authBloc;
           },
@@ -101,10 +103,8 @@ class MyApp extends StatelessWidget {
         ),
         home: BlocBuilder<WeightBloc, WeightState>(builder: (context, state) {
           if (state is WeightLoaded && state.goalStatus.reached) {
-            // إذا وصل، تظهر صفحة الاحتفال لمدة 5 ثواني
             return const IdealWeightSplashScreen();
           }
-          // إذا لم يصل، يذهب مباشرة للشاشة الرئيسية
           return const SplashScreen();
         }),
         getPages: [
@@ -115,9 +115,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-// ✅ شاشة SplashScreen ذكية تتنقل بناءً على حالة AuthBloc
-// lib/main.dart - SplashScreen معدل
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -139,9 +136,7 @@ class SplashScreen extends StatelessWidget {
             backgroundColor: Colors.red,
             colorText: Colors.white,
           );
-        } else if (state is SubscriptionInactive) {
-          Get.offAllNamed('/subscription-inactive');
-        } else {}
+        }
       },
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -149,16 +144,11 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(
-                color: Colors.teal,
-              ),
+              const CircularProgressIndicator(color: Colors.teal),
               const SizedBox(height: 24),
               Text(
                 'جاري التحقق من الجلسة...',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               ),
             ],
           ),
