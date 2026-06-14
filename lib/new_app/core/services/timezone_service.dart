@@ -1,23 +1,35 @@
 // core/services/timezone_service.dart
+import 'package:flutter/material.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 class TimezoneService {
   static Future<void> initialize() async {
+    // تهيئة قاعدة بيانات المناطق الزمنية
     tz.initializeTimeZones();
 
     try {
-      // ✅ استخدام المنطقة الزمنية الحقيقية للجهاز
+      // ✅ الحصول على المنطقة الزمنية الحقيقية للجهاز
       final String timeZoneName =
-          await FlutterNativeTimezone.getLocalTimezone();
+          await FlutterTimezone.getLocalTimezone().toString();
       tz.setLocalLocation(tz.getLocation(timeZoneName));
       debugPrint('✅ Timezone set to: $timeZoneName');
     } catch (e) {
-      debugPrint('⚠️ Failed to get native timezone, using system default: $e');
-      // استخدام المنطقة الزمنية للنظام كـ fallback
+      debugPrint('⚠️ Failed to get native timezone: $e');
+      debugPrint('📍 Using system local timezone as fallback');
       tz.setLocalLocation(tz.local);
     }
+  }
+
+  // دالة مساعدة للحصول على المنطقة الزمنية الحالية
+  static String getCurrentTimezone() {
+    return tz.local.name;
+  }
+
+  // دالة مساعدة لتحويل وقت لأي منطقة زمنية
+  static DateTime convertToTimezone(DateTime dateTime, String timezone) {
+    final location = tz.getLocation(timezone);
+    return tz.TZDateTime.from(dateTime, location);
   }
 }
