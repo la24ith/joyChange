@@ -36,8 +36,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   })  : _authRepository = authRepository,
         _deviceInfoUtil = deviceInfoUtil,
         _checkSubscriptionUseCase = checkSubscriptionUseCase,
-        _checkSessionUseCase =
-            CheckSessionUseCase(authRepository), // ✅ إنشاء الـ use case هنا
+        _checkSessionUseCase = checkSessionUseCase, // ✅ استخدم الـ injected
         _registerUseCase = registerUseCase,
         super(const Unauthenticated()) {
     on<CheckSessionEvent>(_onCheckSession);
@@ -48,6 +47,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<RetryLoginEvent>(_onRetryLogin);
     on<LogoutEvent>(_onLogout);
     on<ClearAuthErrorEvent>(_onClearError);
+    on<StartSubscriptionPollingEvent>(_onStartSubscriptionPolling);
+    on<StartDevicePollingEvent>(_onStartDevicePolling);
+    on<StopPollingEvent>(_onStopPolling);
+    on<ProfileCompletedEvent>(_onProfileCompleted); // ✅ أضف هذا
   }
 
   @override
@@ -55,9 +58,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _pollingTimer?.cancel();
     return super.close();
   }
-// lib/features/auth/presentation/bloc/auth_bloc.dart
 
-// في دالة _onCheckSession
+  // ============================================================
+  // ✅ معالجة CheckSession
+  // ============================================================
   Future<void> _onCheckSession(
     CheckSessionEvent event,
     Emitter<AuthState> emit,
@@ -68,18 +72,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     result.fold(
       (failure) {
-        // ✅ إذا كان الخطأ هو انتهاء الجلسة، انتقل إلى Unauthenticated
         if (failure is SessionExpiredFailure) {
           emit(const Unauthenticated());
         } else if (failure is SubscriptionExpiredFailure) {
           emit(SubscriptionInactive(message: failure.message));
         } else {
-          // ✅ في حالة أي خطأ آخر، حاول استخدام البيانات المحفوظة
           _emitCachedState(emit);
         }
       },
       (sessionResult) {
-        // ✅ التحقق من اكتمال الملف الشخصي
         if (!sessionResult.isProfileComplete) {
           emit(ProfileIncomplete(
             user: sessionResult.user,
@@ -88,7 +89,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         } else {
           emit(Authenticated(
             user: sessionResult.user,
-            token: '', // سيتم استرجاعه من الـ repository عند الحاجة
+            token: '',
           ));
         }
       },
@@ -102,10 +103,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final token = await _authRepository.getStoredToken();
 
       if (user != null && token != null && token.isNotEmpty) {
-        // ✅ التحقق من اكتمال البروفايل
         final secureStorage = getIt.get<SecureStorageService>();
         final profileCompleted =
             await secureStorage.read(key: 'profile_completed');
+
+        print('🔍 _emitCachedState - profile_completed: "$profileCompleted"');
 
         final hasCompleteData = user.currentWeight != null &&
             user.targetWeight != null &&
@@ -114,6 +116,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             user.patientSegment != 'general' &&
             user.phone != null &&
             user.phone!.isNotEmpty;
+
+        print('🔍 _emitCachedState - hasCompleteData: $hasCompleteData');
 
         if (profileCompleted == 'true' && hasCompleteData) {
           emit(Authenticated(
@@ -135,6 +139,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
+  // ============================================================
+  // ✅ معالجة Login
+  // ============================================================
   Future<void> _onLogin(
     LoginEvent event,
     Emitter<AuthState> emit,
@@ -150,17 +157,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     result.fold(
       (failure) {
         emit(AuthError(message: failure.message));
-        // ✅ إزالة Future.delayed من هنا
-        // بدلاً من ذلك، يمكن إضافة حدث لمسح الخطأ
-        add(ClearAuthErrorEvent()); // استخدم add بدلاً من emit
+        add(ClearAuthErrorEvent());
       },
       (response) {
         final state = response.toAuthState();
         emit(state);
 
-        // ✅ لا تستخدم Future.delayed مع emit أبداً
         if (state is PendingSubscription) {
-          // أضف حدثاً لبدء Polling بدلاً من استدعاء دالة مباشرة
           add(StartSubscriptionPollingEvent(email: state.email));
         } else if (state is PendingDeviceApproval) {
           add(StartDevicePollingEvent(
@@ -170,7 +173,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Handle registration
+  // ============================================================
+  // ✅ معالجة Register
+  // ============================================================
   Future<void> _onRegister(
     RegisterEvent event,
     Emitter<AuthState> emit,
@@ -199,7 +204,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         print('🆔 UserId: ${registerResult.userId}');
         print('💬 Message: ${registerResult.message}');
 
-        // ✅ الانتقال إلى حالة PendingSubscription
         emit(PendingSubscription(
           message: registerResult.message,
           email: registerResult.email,
@@ -209,7 +213,48 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Start polling for subscription activation
+  // ============================================================
+  // ✅ معالجة ProfileCompletedEvent
+  // ============================================================
+  Future<void> _onProfileCompleted(
+    ProfileCompletedEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    print('✅ ProfileCompletedEvent received for user: ${event.user.email}');
+
+    // ✅ تحديث الحالة إلى Authenticated مع المستخدم المحدث
+    emit(Authenticated(
+      user: event.user,
+      token: '',
+      hasActiveSubscription: true,
+    ));
+  }
+
+  // ============================================================
+  // ✅ دوال Polling
+  // ============================================================
+  void _onStartSubscriptionPolling(
+    StartSubscriptionPollingEvent event,
+    Emitter<AuthState> emit,
+  ) {
+    _startSubscriptionPolling(emit, event.email);
+  }
+
+  void _onStartDevicePolling(
+    StartDevicePollingEvent event,
+    Emitter<AuthState> emit,
+  ) {
+    _startDevicePolling(emit, event.email, event.deviceId);
+  }
+
+  void _onStopPolling(
+    StopPollingEvent event,
+    Emitter<AuthState> emit,
+  ) {
+    _pollingTimer?.cancel();
+    _pollingCount = 0;
+  }
+
   void _startSubscriptionPolling(Emitter<AuthState> emit, String email) {
     _pollingTimer?.cancel();
     _pollingCount = 0;
@@ -250,7 +295,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Start polling for device approval
   void _startDevicePolling(
       Emitter<AuthState> emit, String email, String deviceId) {
     _pollingTimer?.cancel();
@@ -273,12 +317,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           return;
         }
 
-        // Retry login to check if device is approved
         if (_currentPollingEmail != null && _currentPollingDeviceId != null) {
           final result = await _authRepository.login(
             email: _currentPollingEmail!,
-            password:
-                '', // Password is not available, so we need to handle this
+            password: '',
             deviceId: _currentPollingDeviceId!,
           );
 
@@ -299,7 +341,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Handle retry login after device approval
+  // ============================================================
+  // ✅ دوال أخرى
+  // ============================================================
   Future<void> _onRetryLogin(
     RetryLoginEvent event,
     Emitter<AuthState> emit,
@@ -326,7 +370,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Handle logout
   Future<void> _onLogout(
     LogoutEvent event,
     Emitter<AuthState> emit,
@@ -339,7 +382,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     });
   }
 
-  /// Clear error
   void _onClearError(
     ClearAuthErrorEvent event,
     Emitter<AuthState> emit,
@@ -349,16 +391,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-// lib/features/auth/presentation/bloc/auth_bloc.dart
-
-// أضف هذه الدوال في نهاية ملف AuthBloc، قبل الدوال الأخرى:
-
-  /// Handle check subscription status (polling)
   Future<void> _onCheckSubscriptionStatus(
     CheckSubscriptionStatusEvent event,
     Emitter<AuthState> emit,
   ) async {
-    // Check subscription status using the repository
     final result = await _authRepository.checkSubscriptionStatus(event.email);
 
     result.fold(
@@ -381,13 +417,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Handle check device approval status (polling)
   Future<void> _onCheckDeviceApproval(
     CheckDeviceApprovalEvent event,
     Emitter<AuthState> emit,
   ) async {
-    // Retry login to check if device is approved
-    // Note: We don't have the password during polling, so we need to get it from storage
     final storedPassword = await _getStoredPassword();
 
     if (storedPassword == null || storedPassword.isEmpty) {
@@ -418,16 +451,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
-  /// Helper to get stored password (if needed for polling)
-  /// Note: In production, you should NOT store passwords.
-  /// This is a temporary solution. Better approach: Have a dedicated API for device approval check.
   Future<String?> _getStoredPassword() async {
-    // For security reasons, we don't store passwords
-    // This is a limitation of the current approach
-    // Ideally, the backend should have an endpoint to check device approval without password
     return null;
   }
 
-  /// Check if the bloc is still mounted (not closed)
   bool get mounted => !isClosed;
 }

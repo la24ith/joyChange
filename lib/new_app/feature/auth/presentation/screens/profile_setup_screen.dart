@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/data/datasources/auth_local_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/custom_text_field.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/gradient_button.dart';
@@ -148,8 +149,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           setState(() => _isLoading = false);
         },
         (user) async {
-          // ✅ حفظ حالة الإكمال محلياً
+          // ✅ فقط بعد نجاح التحديث، نحفظ حالة الإكمال
           await _saveProfileCompleted();
+
+          // ✅ تحديث المستخدم في AuthBloc
+          if (mounted) {
+            context.read<AuthBloc>().add(ProfileCompletedEvent(user));
+          }
 
           _showSnackBar('✅ تم حفظ الملف الشخصي بنجاح', isError: false);
           setState(() => _isLoading = false);
@@ -167,14 +173,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
-  /// ✅ حفظ حالة الإكمال في SecureStorage فقط
+  /// ✅ حفظ حالة الإكمال - نسخة مبسطة للغاية
   Future<void> _saveProfileCompleted() async {
     try {
+      // ✅ استخدام SecureStorage مباشرة
       final secureStorage = getIt.get<SecureStorageService>();
+
+      // ✅ حفظ القيمة
       await secureStorage.write(key: 'profile_completed', value: 'true');
-      print('✅ Profile completion status saved locally');
+      print('✅ Profile completion saved: true');
+
+      // ✅ تحقق فوري
+      final saved = await secureStorage.read(key: 'profile_completed');
+      print('🔍 Verification after save: "$saved"');
+
+      // ✅ إذا لم تحفظ، حاول مرة أخرى
+      if (saved != 'true') {
+        print('⚠️ Save failed, retrying...');
+        await secureStorage.write(key: 'profile_completed', value: 'true');
+        final retry = await secureStorage.read(key: 'profile_completed');
+        print('🔍 Retry verification: "$retry"');
+      }
     } catch (e) {
-      print('⚠️ Failed to save profile completion status: $e');
+      print('❌ Error saving profile: $e');
+      // ✅ محاولة بديلة
+      try {
+        final secureStorage = getIt.get<SecureStorageService>();
+        await secureStorage.write(key: 'profile_completed', value: 'true');
+        print('✅ Fallback save successful');
+      } catch (e2) {
+        print('❌ Fallback also failed: $e2');
+      }
     }
   }
 
@@ -199,7 +228,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            // لا نسمح بالرجوع بدون إكمال الملف
             _showExitDialog();
           },
         ),
@@ -244,7 +272,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ✅ عنوان توضيحي
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -270,8 +297,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
-                      // ✅ الاسم
                       CustomTextField(
                         controller: _nameController,
                         labelText: 'الاسم الكامل',
@@ -279,8 +304,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         validator: (value) => _validateRequired(value, 'الاسم'),
                       ),
                       const SizedBox(height: 14),
-
-                      // ✅ رقم الهاتف
                       CustomTextField(
                         controller: _phoneController,
                         labelText: 'رقم الهاتف',
@@ -290,8 +313,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             _validateRequired(value, 'رقم الهاتف'),
                       ),
                       const SizedBox(height: 14),
-
-                      // ✅ الوزن الحالي
                       CustomTextField(
                         controller: _currentWeightController,
                         labelText: 'الوزن الحالي (كجم)',
@@ -302,8 +323,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             _validateWeight(value, 'الوزن الحالي'),
                       ),
                       const SizedBox(height: 14),
-
-                      // ✅ الوزن المستهدف
                       CustomTextField(
                         controller: _targetWeightController,
                         labelText: 'الوزن المستهدف (كجم)',
@@ -314,8 +333,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             _validateWeight(value, 'الوزن المستهدف'),
                       ),
                       const SizedBox(height: 14),
-
-                      // ✅ الطول
                       CustomTextField(
                         controller: _heightController,
                         labelText: 'الطول (سم)',
@@ -325,8 +342,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         validator: _validateHeight,
                       ),
                       const SizedBox(height: 20),
-
-                      // ✅ اختيار الفئة
                       Text(
                         'اختر الفئة المناسبة لك',
                         style: TextStyle(
@@ -366,17 +381,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-
-                      // ✅ زر الحفظ
                       GradientButton(
                         label: 'حفظ الملف الشخصي',
                         isLoading: _isLoading,
                         onPressed: _saveProfile,
                       ),
-
                       const SizedBox(height: 16),
-
-                      // ✅ ملاحظة
                       Center(
                         child: Text(
                           'يمكنك تعديل هذه المعلومات لاحقاً من الإعدادات',
@@ -412,7 +422,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // تسجيل الخروج
               context.read<AuthBloc>().add(LogoutEvent());
               Get.offAllNamed('/login');
             },

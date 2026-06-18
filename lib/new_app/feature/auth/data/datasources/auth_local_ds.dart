@@ -12,22 +12,62 @@ class AuthLocalDataSource {
   final SecureStorageService _secureStorage;
   final Box? _userBox;
 
+  static const String _profileCompletedKey = 'profile_completed';
+
   AuthLocalDataSource({
     required SecureStorageService secureStorage,
     Box? userBox,
   })  : _secureStorage = secureStorage,
         _userBox = userBox ?? Hive.box('user_box');
 
-  /// Save authentication token
+  /// ✅ Helper لتقطيع النص بأمان
+  String _safeSubstring(String text, int start, int end) {
+    if (text.length <= end) {
+      return text;
+    }
+    return text.substring(start, end);
+  }
+// lib/features/auth/data/datasources/auth_local_ds.dart
+
+  /// Save authentication token - نسخة آمنة
   Future<void> saveToken(String token) async {
     print('💾 Saving token to secure storage...');
     await _secureStorage.write(key: StorageKeys.accessToken, value: token);
     print('✅ Token saved successfully');
 
-    // ✅ تحقق فوري
-    final saved = await _secureStorage.read(key: StorageKeys.accessToken);
-    print(
-        '🔍 Verification - Token saved: ${saved != null ? "Yes (${saved.substring(0, 20)}...)" : "No"}');
+    // ✅ تحقق آمن
+    try {
+      final saved = await _secureStorage.read(key: StorageKeys.accessToken);
+      if (saved != null && saved.isNotEmpty) {
+        // ✅ تجنب substring على نصوص قصيرة
+        final preview =
+            saved.length > 20 ? '${saved.substring(0, 20)}...' : saved;
+        print('🔍 Verification - Token saved: Yes ($preview)');
+      } else {
+        print('🔍 Verification - Token saved: No');
+      }
+    } catch (e) {
+      print('⚠️ Could not verify token: $e');
+    }
+  }
+
+  /// Get token - نسخة آمنة
+  Future<String?> getToken() async {
+    try {
+      final token = await _secureStorage.read(key: StorageKeys.accessToken);
+      if (token != null && token.isNotEmpty) {
+        // ✅ تجنب substring على نصوص قصيرة
+        final preview =
+            token.length > 20 ? '${token.substring(0, 20)}...' : token;
+        print('🔍 Reading token: Yes ($preview)');
+      } else {
+        print('🔍 Reading token: No');
+      }
+      return token;
+    } catch (e) {
+      print('❌ Error reading token: $e');
+      return null;
+    }
   }
 
   /// Save device ID
@@ -39,13 +79,6 @@ class AuthLocalDataSource {
   /// Get device ID
   Future<String?> getDeviceId() async {
     return await _secureStorage.read(key: StorageKeys.deviceId);
-  }
-
-  Future<String?> getToken() async {
-    final token = await _secureStorage.read(key: StorageKeys.accessToken);
-    print(
-        '🔍 Reading token from secure storage: ${token != null ? "Yes (${token.substring(0, 20)}...)" : "No"}');
-    return token;
   }
 
   /// Delete authentication token
@@ -130,34 +163,96 @@ class AuthLocalDataSource {
     return await _secureStorage.read(key: StorageKeys.userEmail);
   }
 
+  // ============================================================
+  // ✅ ✅ ✅ دوال حالة إكمال البروفايل
+  // ============================================================
+
   /// ✅ Save profile completion status
   Future<void> saveProfileCompleted(bool completed) async {
-    await _secureStorage.write(
-      key: 'profile_completed',
-      value: completed.toString(),
-    );
-    print('✅ Profile completion status saved: $completed');
+    try {
+      final value = completed ? 'true' : 'false';
+      print('💾 Saving profile completion: $completed');
+
+      await _secureStorage.write(
+        key: _profileCompletedKey,
+        value: value,
+      );
+
+      print('✅ Profile completion saved: $completed');
+
+      // ✅ تحقق بسيط
+      try {
+        final saved = await _secureStorage.read(key: _profileCompletedKey);
+        print('🔍 Verification: "$saved"');
+      } catch (e) {
+        print('⚠️ Could not verify: $e');
+      }
+    } catch (e) {
+      print('❌ Error saving profile completion: $e');
+      // ✅ لا نرمي الخطأ
+    }
   }
 
   /// ✅ Get profile completion status
   Future<bool> getProfileCompleted() async {
-    final value = await _secureStorage.read(key: 'profile_completed');
-    return value == 'true';
+    try {
+      final value = await _secureStorage.read(key: _profileCompletedKey);
+      print('🔍 Reading profile completion: "$value"');
+      return value == 'true';
+    } catch (e) {
+      print('❌ Error reading profile completion: $e');
+      return false;
+    }
   }
 
-  /// ✅ Reset profile completion status (for testing or re-prompt)
-  Future<void> resetProfileCompleted() async {
-    await _secureStorage.delete(key: 'profile_completed');
-    print('✅ Profile completion status reset');
+  /// ✅ Get profile completion status without logging
+  Future<bool> getProfileCompletedSilent() async {
+    try {
+      final value = await _secureStorage.read(key: _profileCompletedKey);
+      return value == 'true';
+    } catch (e) {
+      return false;
+    }
   }
+
+  /// ✅ Reset profile completion status
+  Future<void> resetProfileCompleted() async {
+    try {
+      await _secureStorage.delete(key: _profileCompletedKey);
+      print('✅ Profile completion status reset');
+    } catch (e) {
+      print('❌ Error resetting: $e');
+    }
+  }
+
+  /// ✅ Force set profile completion status
+  Future<void> forceSetProfileCompleted(bool completed) async {
+    try {
+      final value = completed ? 'true' : 'false';
+      await _secureStorage.write(key: _profileCompletedKey, value: value);
+      print('✅ Force set to: $completed');
+    } catch (e) {
+      print('❌ Error force setting: $e');
+    }
+  }
+
+  // ============================================================
+  // ✅ دوال إدارة البيانات العامة
+  // ============================================================
 
   /// Clear all local auth data (logout)
   Future<void> clearAllAuthData() async {
     await deleteToken();
     await deleteCachedUser();
-    // Don't delete device ID as it's persistent
-    // Don't delete user email as it's helpful for next login
-    // Don't delete profile_completed as it should persist across logouts
+    print('✅ Auth data cleared (profile status kept)');
+  }
+
+  /// Clear all data including profile status
+  Future<void> clearAllData() async {
+    await deleteToken();
+    await deleteCachedUser();
+    await _secureStorage.delete(key: _profileCompletedKey);
+    print('✅ All data cleared');
   }
 
   /// Save last login time
@@ -177,9 +272,27 @@ class AuthLocalDataSource {
     return null;
   }
 
-  /// Check if user is logged in (has token)
+  /// Check if user is logged in
   Future<bool> isLoggedIn() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;
+  }
+
+  /// Check if user has complete profile data
+  bool hasCompleteProfileData(UserModel user) {
+    return user.currentWeight != null &&
+        user.targetWeight != null &&
+        user.height != null &&
+        user.patientSegment.isNotEmpty &&
+        user.patientSegment != 'general' &&
+        user.phone != null &&
+        user.phone!.isNotEmpty;
+  }
+
+  /// Check if user is fully set up
+  Future<bool> isUserFullySetUp(UserModel user) async {
+    final hasData = hasCompleteProfileData(user);
+    if (!hasData) return false;
+    return await getProfileCompleted();
   }
 }

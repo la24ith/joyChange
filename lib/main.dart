@@ -62,6 +62,55 @@ void main() async {
 
   await registerNotificationSync();
   await setupServiceLocator();
+  // lib/main.dart - بعد setupServiceLocator()
+
+// ✅ ✅ ✅ إصلاح تلقائي لحالة البروفايل
+  try {
+    final secureStorage = getIt.get<SecureStorageService>();
+    final authRepo = getIt.get<AuthRepository>();
+
+    // ✅ قراءة المستخدم المحفوظ
+    final user = await authRepo.getStoredUser();
+
+    if (user != null) {
+      print('👤 Found user: ${user.email}');
+
+      // ✅ التحقق من اكتمال البيانات
+      final hasCompleteData = user.currentWeight != null &&
+          user.targetWeight != null &&
+          user.height != null &&
+          user.patientSegment.isNotEmpty &&
+          user.patientSegment != 'general' &&
+          user.phone != null &&
+          user.phone!.isNotEmpty;
+
+      print('📊 Has complete data: $hasCompleteData');
+
+      if (hasCompleteData) {
+        // ✅ قراءة الحالة الحالية
+        final current = await secureStorage.read(key: 'profile_completed');
+        print('🔍 Current profile_completed: "$current"');
+
+        // ✅ إذا كانت الحالة غير صحيحة، قم بإصلاحها
+        if (current != 'true') {
+          await secureStorage.write(key: 'profile_completed', value: 'true');
+          print('✅ Auto-fixed profile status for: ${user.email}');
+
+          // ✅ تحقق من الإصلاح
+          final fixed = await secureStorage.read(key: 'profile_completed');
+          print('🔍 After fix: "$fixed"');
+        } else {
+          print('✅ Profile status already correct');
+        }
+      } else {
+        print('⚠️ User data incomplete, profile setup needed');
+      }
+    } else {
+      print('⚠️ No user found in storage');
+    }
+  } catch (e) {
+    print('⚠️ Auto-fix attempt failed: $e');
+  }
 
   // ✅ تخزين الـ plugin في service locator
   getIt.registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);

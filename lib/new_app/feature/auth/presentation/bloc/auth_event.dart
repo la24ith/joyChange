@@ -1,6 +1,7 @@
 // lib/features/auth/presentation/bloc/auth_event.dart
 
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/user.dart';
 
 /// Base class for all authentication events
 sealed class AuthEvent extends Equatable {
@@ -92,20 +93,35 @@ final class LogoutEvent extends AuthEvent {}
 
 /// Event to clear error message
 final class ClearAuthErrorEvent extends AuthEvent {}
-// في auth_event.dart
 
-/// Event to start subscription polling
+/// ✅ Event to start subscription polling
 final class StartSubscriptionPollingEvent extends AuthEvent {
   final String email;
   const StartSubscriptionPollingEvent({required this.email});
+
+  @override
+  List<Object?> get props => [email];
 }
 
-/// Event to start device polling
+/// ✅ Event to start device polling
 final class StartDevicePollingEvent extends AuthEvent {
   final String email;
   final String deviceId;
   const StartDevicePollingEvent({required this.email, required this.deviceId});
+
+  @override
+  List<Object?> get props => [email, deviceId];
 }
 
-/// Event to stop polling
+/// ✅ Event to stop polling
 final class StopPollingEvent extends AuthEvent {}
+
+/// ✅ Event to mark profile as completed (مع النوع الصحيح)
+final class ProfileCompletedEvent extends AuthEvent {
+  final User user;
+
+  const ProfileCompletedEvent(this.user);
+
+  @override
+  List<Object?> get props => [user];
+}
