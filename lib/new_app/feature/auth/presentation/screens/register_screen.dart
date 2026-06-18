@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/profile_setup_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/custom_text_field.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/gradient_button.dart';
 import '../bloc/auth_bloc.dart';
@@ -65,7 +66,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             } else {
               setState(() => _isLoading = false);
             }
-
+            if (state is ProfileIncomplete) {
+              _showSnackBar(state.message, isError: false);
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  Get.offAll(() => const ProfileSetupScreen());
+                }
+              });
+            }
             if (state is Authenticated) {
               // ✅ تسجيل ناجح واشتراك فعال
               _showSnackBar('تم إنشاء الحساب بنجاح', isError: false);

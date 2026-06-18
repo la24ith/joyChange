@@ -120,8 +120,6 @@ class AuthLocalDataSource {
     await _userBox?.delete('current_user');
   }
 
-  /// Save device ID
-
   /// Save user email (for quick login form)
   Future<void> saveUserEmail(String email) async {
     await _secureStorage.write(key: StorageKeys.userEmail, value: email);
@@ -132,12 +130,34 @@ class AuthLocalDataSource {
     return await _secureStorage.read(key: StorageKeys.userEmail);
   }
 
+  /// ✅ Save profile completion status
+  Future<void> saveProfileCompleted(bool completed) async {
+    await _secureStorage.write(
+      key: 'profile_completed',
+      value: completed.toString(),
+    );
+    print('✅ Profile completion status saved: $completed');
+  }
+
+  /// ✅ Get profile completion status
+  Future<bool> getProfileCompleted() async {
+    final value = await _secureStorage.read(key: 'profile_completed');
+    return value == 'true';
+  }
+
+  /// ✅ Reset profile completion status (for testing or re-prompt)
+  Future<void> resetProfileCompleted() async {
+    await _secureStorage.delete(key: 'profile_completed');
+    print('✅ Profile completion status reset');
+  }
+
   /// Clear all local auth data (logout)
   Future<void> clearAllAuthData() async {
     await deleteToken();
     await deleteCachedUser();
     // Don't delete device ID as it's persistent
     // Don't delete user email as it's helpful for next login
+    // Don't delete profile_completed as it should persist across logouts
   }
 
   /// Save last login time

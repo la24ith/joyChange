@@ -2,7 +2,9 @@
 
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_session_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_subscription_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/register_usecase.dart';
@@ -53,7 +55,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _pollingTimer?.cancel();
     return super.close();
   }
+// lib/features/auth/presentation/bloc/auth_bloc.dart
 
+// في دالة _onCheckSession
   Future<void> _onCheckSession(
     CheckSessionEvent event,
     Emitter<AuthState> emit,
@@ -64,24 +68,72 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     result.fold(
       (failure) {
-        if (failure is SubscriptionExpiredFailure) {
+        // ✅ إذا كان الخطأ هو انتهاء الجلسة، انتقل إلى Unauthenticated
+        if (failure is SessionExpiredFailure) {
+          emit(const Unauthenticated());
+        } else if (failure is SubscriptionExpiredFailure) {
           emit(SubscriptionInactive(message: failure.message));
         } else {
-          emit(Unauthenticated());
+          // ✅ في حالة أي خطأ آخر، حاول استخدام البيانات المحفوظة
+          _emitCachedState(emit);
         }
       },
-      (user) {
-        // ✅ يوجد جلسة صالحة، انتقل مباشرة إلى Home
-        emit(Authenticated(
-          user: user,
-          token: '', // Token سيتم استرجاعه من الـ repository عند الحاجة
-        ));
+      (sessionResult) {
+        // ✅ التحقق من اكتمال الملف الشخصي
+        if (!sessionResult.isProfileComplete) {
+          emit(ProfileIncomplete(
+            user: sessionResult.user,
+            message: 'يرجى إكمال ملفك الشخصي',
+          ));
+        } else {
+          emit(Authenticated(
+            user: sessionResult.user,
+            token: '', // سيتم استرجاعه من الـ repository عند الحاجة
+          ));
+        }
       },
     );
   }
 
-  /// Handle login
-  // في auth_bloc.dart - دالة _onLogin
+  /// ✅ محاولة استخدام البيانات المحفوظة في حالة الخطأ
+  Future<void> _emitCachedState(Emitter<AuthState> emit) async {
+    try {
+      final user = await _authRepository.getStoredUser();
+      final token = await _authRepository.getStoredToken();
+
+      if (user != null && token != null && token.isNotEmpty) {
+        // ✅ التحقق من اكتمال البروفايل
+        final secureStorage = getIt.get<SecureStorageService>();
+        final profileCompleted =
+            await secureStorage.read(key: 'profile_completed');
+
+        final hasCompleteData = user.currentWeight != null &&
+            user.targetWeight != null &&
+            user.height != null &&
+            user.patientSegment.isNotEmpty &&
+            user.patientSegment != 'general' &&
+            user.phone != null &&
+            user.phone!.isNotEmpty;
+
+        if (profileCompleted == 'true' && hasCompleteData) {
+          emit(Authenticated(
+            user: user,
+            token: token,
+          ));
+        } else {
+          emit(ProfileIncomplete(
+            user: user,
+            message: 'يرجى إكمال ملفك الشخصي',
+          ));
+        }
+      } else {
+        emit(const Unauthenticated());
+      }
+    } catch (e) {
+      print('⚠️ Error emitting cached state: $e');
+      emit(const Unauthenticated());
+    }
+  }
 
   Future<void> _onLogin(
     LoginEvent event,

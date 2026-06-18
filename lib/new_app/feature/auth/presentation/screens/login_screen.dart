@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_strings.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/entities/user.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/profile_setup_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/register_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subscription_expired_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/widget/custom_text_field.dart';
@@ -128,7 +132,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
           if (state is Authenticated) {
             _showSnackBar('تم تسجيل الدخول بنجاح', isError: false);
-            Get.offAll(() => const NavigationScreen());
+            // ✅ التحقق من اكتمال البروفايل محلياً
+            _checkProfileCompletionAndNavigate(state.user);
           } else if (state is PendingSubscription) {
             _showSnackBar(state.message, isError: false);
             Future.delayed(const Duration(milliseconds: 500), () {
@@ -148,7 +153,6 @@ class _LoginScreenState extends State<LoginScreen> {
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) {
                 Get.offAll(() => const SubscriptionExpiredScreen());
-                ;
               }
             });
           } else if (state is PendingDeviceApproval) {
@@ -385,6 +389,36 @@ class _LoginScreenState extends State<LoginScreen> {
               deviceId: deviceId,
             ),
           );
+    }
+  }
+
+  /// ✅ التحقق من اكتمال البروفايل والتنقل المناسب
+  Future<void> _checkProfileCompletionAndNavigate(User user) async {
+    try {
+      final secureStorage = getIt.get<SecureStorageService>();
+      final profileCompleted =
+          await secureStorage.read(key: 'profile_completed');
+
+      // ✅ التحقق من اكتمال البيانات أيضاً
+      final hasCompleteData = user.currentWeight != null &&
+          user.targetWeight != null &&
+          user.height != null &&
+          user.patientSegment.isNotEmpty &&
+          user.patientSegment != 'general' &&
+          user.phone != null &&
+          user.phone!.isNotEmpty;
+
+      // ✅ إذا كان البروفايل مكتملاً أو البيانات موجودة
+      if (profileCompleted == 'true' && hasCompleteData) {
+        Get.offAll(() => const NavigationScreen());
+      } else {
+        // ✅ إذا لم يكتمل البروفايل بعد
+        Get.offAll(() => const ProfileSetupScreen());
+      }
+    } catch (e) {
+      print('⚠️ Error checking profile completion: $e');
+      // في حالة الخطأ، ننتقل إلى ProfileSetupScreen كإجراء آمن
+      Get.offAll(() => const ProfileSetupScreen());
     }
   }
 

@@ -207,4 +207,43 @@ class AuthRemoteDataSource {
       print('⚠️ Logout API error: $e');
     }
   }
+
+  Future<UserModel> updateProfile({
+    String? name,
+    String? phone,
+    double? currentWeight,
+    double? targetWeight,
+    double? height,
+    String? patientSegment,
+  }) async {
+    try {
+      final Map<String, dynamic> data = {};
+      if (name != null) data['name'] = name;
+      if (phone != null) data['phone'] = phone;
+      if (currentWeight != null) data['current_weight'] = currentWeight;
+      if (targetWeight != null) data['target_weight'] = targetWeight;
+      if (height != null) data['height'] = height;
+      if (patientSegment != null) data['patient_segment'] = patientSegment;
+
+      final response = await _dioClient.put(
+        ApiEndpoints.profile,
+        data: data,
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final userData = response.data['data']['user'] as Map<String, dynamic>;
+        return UserModel.fromJson(userData);
+      } else {
+        throw ServerException(
+          message: response.data['message'] ?? 'Failed to update profile',
+          statusCode: response.statusCode,
+        );
+      }
+    } on DioException catch (e) {
+      throw ServerException(
+        message: 'Network error: ${e.message}',
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
 }

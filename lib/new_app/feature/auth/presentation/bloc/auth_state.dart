@@ -114,3 +114,30 @@ final class AuthError extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+/// User is authenticated but profile is incomplete
+final class ProfileIncomplete extends AuthState {
+  final User user;
+  final String message;
+
+  const ProfileIncomplete({
+    required this.user,
+    required this.message,
+  });
+
+  @override
+  List<Object?> get props => [user, message];
+}
+
+final class OfflineAuthenticated extends AuthState {
+  final User user;
+  final String token;
+
+  const OfflineAuthenticated({
+    required this.user,
+    required this.token,
+  });
+
+  @override
+  List<Object?> get props => [user, token];
+}

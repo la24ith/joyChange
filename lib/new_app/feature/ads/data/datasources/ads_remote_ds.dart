@@ -16,12 +16,43 @@ class AdsRemoteDataSource {
     try {
       final response = await _dioClient.get(ApiEndpoints.activeAds);
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final List<dynamic> data = response.data['data'];
-        return data.map((json) => AdModel.fromJson(json)).toList();
+      // الرد قد لا يكون Map إذا أرجع السيرفر خطأ غير متوقع (صفحة HTML
+      // من nginx/Apache، أو نص فاضي عند انقطاع الاتصال بمنتصف الطلب).
+      // الفهرسة المباشرة response.data['success'] في هذه الحالة ترمي
+      // TypeError وليس DioException، فلا تُمسك بمعالج DioException أدناه.
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
+        throw ServerException(
+          message: 'استجابة غير متوقعة من السيرفر',
+          statusCode: response.statusCode,
+        );
+      }
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        final rawData = responseData['data'];
+        if (rawData is! List) {
+          throw ServerException(
+            message: 'تنسيق بيانات الإعلانات غير صحيح',
+            statusCode: response.statusCode,
+          );
+        }
+
+        final List<AdModel> ads = [];
+
+        // نحلّل كل إعلان بشكل منفصل: إذا فشل عنصر واحد (بيانات ناقصة
+        // أو غير متوقعة من السيرفر)، نتجاهله فقط بدل رمي استثناء يُفقد
+        // كل الإعلانات الأخرى الصالحة في نفس الرد.
+        for (final json in rawData) {
+          try {
+            ads.add(AdModel.fromJson(json as Map<String, dynamic>));
+          } catch (_) {
+            continue;
+          }
+        }
+        return ads;
       } else {
         throw ServerException(
-          message: response.data['message'] ?? 'Failed to load ads',
+          message: responseData['message'] ?? 'Failed to load ads',
           statusCode: response.statusCode,
         );
       }
@@ -39,9 +70,17 @@ class AdsRemoteDataSource {
       final response =
           await _dioClient.post('${ApiEndpoints.activeAds}/$adId/click');
 
-      if (response.statusCode != 200 || response.data['success'] != true) {
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
         throw ServerException(
-          message: response.data['message'] ?? 'Failed to register click',
+          message: 'استجابة غير متوقعة من السيرفر',
+          statusCode: response.statusCode,
+        );
+      }
+
+      if (response.statusCode != 200 || responseData['success'] != true) {
+        throw ServerException(
+          message: responseData['message'] ?? 'Failed to register click',
           statusCode: response.statusCode,
         );
       }

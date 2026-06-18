@@ -96,6 +96,13 @@ class LoginResponseModel extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [success, code, message, token, user, userId, email];
+  List<Object?> get props => [
+        success,
+        code,
+        message,
+        token,
+        user,
+        userId,
+        email,
+      ];
 }

@@ -2,65 +2,121 @@
 
 import 'package:dartz/dartz.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
-import '../entities/user.dart';
-import '../repositories/auth_repository.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/entities/user.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/repositories/auth_repository.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class CheckSessionUseCase {
   final AuthRepository repository;
 
   CheckSessionUseCase(this.repository);
 
-  Future<Either<Failure, User>> call() async {
-    // ✅ محاولة استرجاع token من التخزين المحلي
+  Future<Either<Failure, CheckSessionResult>> call() async {
+    // ✅ أولاً: التحقق من الاتصال بالإنترنت
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final isConnected = connectivityResult != ConnectivityResult.none;
+
+    // ✅ ثانياً: الحصول على البيانات المحفوظة
     final token = await repository.getStoredToken();
-
-    if (token == null || token.isEmpty) {
-      print('🔐 No stored token found');
-      return Left(SessionExpiredFailure(
-        message: 'No session found. Please login.',
-      ));
-    }
-
-    print('✅ Stored token found: ${token.substring(0, 20)}...');
-
-    // ✅ محاولة استرجاع المستخدم من التخزين المحلي
     final user = await repository.getStoredUser();
 
-    if (user == null) {
-      print('❌ No stored user found');
-      return Left(SessionExpiredFailure(
-        message: 'User data not found. Please login again.',
-      ));
+    // ✅ إذا كان هناك توكن ومستخدم محفوظ
+    if (token != null && token.isNotEmpty && user != null) {
+      // ✅ التحقق من اكتمال البروفايل من التخزين المحلي
+      final isProfileComplete = await _isProfileCompleteLocally(user);
+
+      // ✅ إذا لم يكن هناك اتصال، استخدم البيانات المحفوظة مباشرة
+      if (!isConnected) {
+        print('📱 Offline mode: Using cached session');
+        return Right(CheckSessionResult(
+          user: user,
+          isProfileComplete: isProfileComplete,
+        ));
+      }
+
+      // ✅ يوجد اتصال - تحقق من صحة الجلسة مع السيرفر
+      try {
+        final subscriptionResult =
+            await repository.checkSubscriptionStatus(user.email);
+
+        return subscriptionResult.fold(
+          (failure) {
+            // ✅ في حالة فشل التحقق، استخدم البيانات المحفوظة
+            print('⚠️ Subscription check failed, using cached data');
+            return Right(CheckSessionResult(
+              user: user,
+              isProfileComplete: isProfileComplete,
+            ));
+          },
+          (isActive) {
+            if (isActive) {
+              return Right(CheckSessionResult(
+                user: user,
+                isProfileComplete: isProfileComplete,
+              ));
+            } else {
+              // ✅ الاشتراك غير نشط - احذف الجلسة المحفوظة
+              repository.clearLocalAuthData();
+              return Left(SubscriptionExpiredFailure(
+                message: 'Your subscription has expired.',
+              ));
+            }
+          },
+        );
+      } catch (e) {
+        // ✅ في حالة الخطأ، استخدم البيانات المحفوظة
+        print('⚠️ Error checking session: $e, using cached data');
+        return Right(CheckSessionResult(
+          user: user,
+          isProfileComplete: isProfileComplete,
+        ));
+      }
     }
 
-    print('✅ Stored user found: ${user.email}');
+    // ✅ لا توجد جلسة محفوظة
+    return Left(SessionExpiredFailure(
+      message: 'No session found. Please login.',
+    ));
+  }
 
-    // ✅ التحقق من صلاحية الاشتراك (اختياري)
+  /// ✅ التحقق من اكتمال البروفايل من التخزين المحلي
+  Future<bool> _isProfileCompleteLocally(User user) async {
     try {
-      final subscriptionResult =
-          await repository.checkSubscriptionStatus(user.email);
+      // 1. التحقق من وجود بيانات البروفايل
+      final hasData = user.currentWeight != null &&
+          user.targetWeight != null &&
+          user.height != null &&
+          user.patientSegment.isNotEmpty &&
+          user.patientSegment != 'general' &&
+          user.phone != null &&
+          user.phone!.isNotEmpty;
 
-      return subscriptionResult.fold(
-        (failure) {
-          print('⚠️ Subscription check failed: ${failure.message}');
-          // في حال فشل التحقق، نعتبر المستخدم مسجلاً دخول
-          return Right(user);
-        },
-        (isActive) {
-          if (isActive) {
-            print('✅ Subscription is active');
-            return Right(user);
-          } else {
-            print('❌ Subscription is inactive');
-            return Left(SubscriptionExpiredFailure(
-              message: 'Your subscription has expired. Please contact support.',
-            ));
-          }
-        },
-      );
+      if (!hasData) {
+        return false;
+      }
+
+      // 2. التحقق من حالة الإكمال في SecureStorage
+      final secureStorage = getIt.get<SecureStorageService>();
+      final profileCompleted =
+          await secureStorage.read(key: 'profile_completed');
+
+      return profileCompleted == 'true';
     } catch (e) {
-      print('⚠️ Error checking subscription: $e');
-      return Right(user);
+      print('⚠️ Error checking profile completion: $e');
+      return false;
     }
   }
+}
+
+/// ✅ نتيجة التحقق من الجلسة
+class CheckSessionResult {
+  final User user;
+  final bool isProfileComplete;
+
+  const CheckSessionResult({
+    required this.user,
+    required this.isProfileComplete,
+  });
 }

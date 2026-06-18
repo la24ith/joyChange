@@ -14,13 +14,33 @@ final class AdsInitial extends AdsState {}
 
 final class AdsLoading extends AdsState {}
 
+/// الحالة الرئيسية لعرض الإعلانات.
+/// [navigationRequest] هو حدث عابر (one-time event) يُستخدم فقط لإخبار
+/// الواجهة بأنه يجب فتح رابط معيّن، ولا يعني أبداً أن قائمة الإعلانات
+/// قد تغيّرت أو اختفت. هذا يحل مشكلة اختفاء الإعلانات بعد الضغط عليها،
+/// لأن النقر لا يستبدل AdsLoaded بحالة أخرى، بل يحدّث نفس الحالة مع
+/// إضافة معلومة التنقل فقط.
 final class AdsLoaded extends AdsState {
   final List<Ad> ads;
+  final AdNavigationRequest? navigationRequest;
 
-  const AdsLoaded({required this.ads});
+  const AdsLoaded({required this.ads, this.navigationRequest});
+
+  AdsLoaded copyWith({
+    List<Ad>? ads,
+    AdNavigationRequest? navigationRequest,
+    bool clearNavigationRequest = false,
+  }) {
+    return AdsLoaded(
+      ads: ads ?? this.ads,
+      navigationRequest: clearNavigationRequest
+          ? null
+          : (navigationRequest ?? this.navigationRequest),
+    );
+  }
 
   @override
-  List<Object?> get props => [ads];
+  List<Object?> get props => [ads, navigationRequest];
 }
 
 final class AdsError extends AdsState {
@@ -32,12 +52,21 @@ final class AdsError extends AdsState {
   List<Object?> get props => [message];
 }
 
-final class ClickRegistered extends AdsState {
+/// معلومة وصفية لطلب تنقّل ناتج عن نقرة على إعلان.
+/// تحمل رقماً تسلسلياً [requestId] فريد لكل نقرة حتى تستطيع الواجهة
+/// التمييز بين طلب جديد وطلب قديم تمت معالجته من قبل (تجنّب فتح
+/// الرابط أكثر من مرة بسبب إعادة بناء الواجهة).
+class AdNavigationRequest extends Equatable {
+  final int requestId;
   final String? linkUrl;
-  final String linkType;
+  final String linkType; // 'external' أو 'internal'
 
-  const ClickRegistered({this.linkUrl, required this.linkType});
+  const AdNavigationRequest({
+    required this.requestId,
+    required this.linkUrl,
+    required this.linkType,
+  });
 
   @override
-  List<Object?> get props => [linkUrl, linkType];
+  List<Object?> get props => [requestId, linkUrl, linkType];
 }

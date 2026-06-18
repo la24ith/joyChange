@@ -70,4 +70,12 @@ abstract class AuthRepository {
     required String deviceId,
     String? password,
   });
+  Future<Either<Failure, User>> updateProfile({
+    String? name,
+    String? phone,
+    double? currentWeight,
+    double? targetWeight,
+    double? height,
+    String? patientSegment,
+  });
 }

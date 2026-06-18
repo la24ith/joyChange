@@ -21,6 +21,7 @@ import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_subs
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/login_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/logout_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/register_usecase.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/data/datasources/daily_commitment_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/data/repositories/daily_commitment_repository_impl.dart';
@@ -126,7 +127,9 @@ Future<void> setupServiceLocator() async {
       () => CheckSubscriptionUseCase(getIt<AuthRepository>()));
   getIt.registerLazySingleton<LogoutUseCase>(
       () => LogoutUseCase(getIt<AuthRepository>()));
-
+  getIt.registerLazySingleton<UpdateProfileUseCase>(
+    () => UpdateProfileUseCase(getIt<AuthRepository>()),
+  );
   // ============================================================================
   // Auth Presentation Layer
   // ============================================================================

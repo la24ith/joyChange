@@ -1,7 +1,9 @@
 // lib/features/auth/data/repositories/auth_repository_impl.dart
 
 import 'package:dartz/dartz.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/data/models/auth_state_model.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/user.dart';
@@ -199,6 +201,47 @@ class AuthRepositoryImpl implements AuthRepository {
       print('❌ Check auth state error: $e');
       return Left(ServerFailure(
         message: 'Failed to check authentication state: ${e.toString()}',
+      ));
+    }
+  }
+
+  // lib/features/auth/data/repositories/auth_repository_impl.dart
+  @override
+  Future<Either<Failure, User>> updateProfile({
+    String? name,
+    String? phone,
+    double? currentWeight,
+    double? targetWeight,
+    double? height,
+    String? patientSegment,
+  }) async {
+    try {
+      final user = await remoteDataSource.updateProfile(
+        name: name,
+        phone: phone,
+        currentWeight: currentWeight,
+        targetWeight: targetWeight,
+        height: height,
+        patientSegment: patientSegment,
+      );
+
+      // ✅ حفظ المستخدم المحدث محلياً
+      final userEntity = user.toEntity();
+      await localDataSource.saveUser(UserModel.fromEntity(userEntity));
+
+      // ✅ حفظ حالة الإكمال في SecureStorage
+      try {
+        final secureStorage = getIt.get<SecureStorageService>();
+        await secureStorage.write(key: 'profile_completed', value: 'true');
+        print('✅ Profile completion status saved in repository');
+      } catch (e) {
+        print('⚠️ Failed to save profile completion: $e');
+      }
+
+      return Right(userEntity);
+    } catch (e) {
+      return Left(ServerFailure(
+        message: 'Failed to update profile: ${e.toString()}',
       ));
     }
   }

@@ -8,17 +8,37 @@ import 'package:joy_of_change_v3/new_app/feature/ads/presentation/bloc/ads_state
 import '../bloc/ads_bloc.dart';
 import '../bloc/ads_event.dart';
 import 'ad_card.dart';
+import 'ad_navigation_handler.dart';
 
-class AdCarousel extends StatelessWidget {
+class AdCarousel extends StatefulWidget {
   const AdCarousel({super.key});
+
+  @override
+  State<AdCarousel> createState() => _AdCarouselState();
+}
+
+class _AdCarouselState extends State<AdCarousel> {
+  @override
+  void initState() {
+    super.initState();
+    final bloc = context.read<AdsBloc>();
+    if (bloc.state is AdsInitial) {
+      bloc.add(LoadActiveAdsEvent());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return BlocBuilder<AdsBloc, AdsState>(
+    return BlocConsumer<AdsBloc, AdsState>(
+      listener: (context, state) {
+        if (state is AdsLoaded) {
+          handleAdNavigation(context, state.navigationRequest);
+        }
+      },
       builder: (context, state) {
-        if (state is AdsLoading) {
+        if (state is AdsLoading || state is AdsInitial) {
           return const SizedBox.shrink();
         }
 
@@ -43,10 +63,7 @@ class AdCarousel extends StatelessWidget {
               return AdCard(
                 ad: ad,
                 onTap: () {
-                  context
-                      .read<AdsBloc>()
-                      .add(RegisterAdClickEvent(adId: ad.id));
-                  _handleAdTap(context, ad);
+                  context.read<AdsBloc>().add(RegisterAdClickEvent(ad: ad));
                 },
               );
             },
@@ -56,13 +73,5 @@ class AdCarousel extends StatelessWidget {
         return const SizedBox.shrink();
       },
     );
-  }
-
-  void _handleAdTap(BuildContext context, Ad ad) {
-    if (ad.linkUrl != null && ad.linkUrl!.isNotEmpty) {
-      // يمكن إضافة منطق فتح الرابط هنا
-      // إذا كان internal → navigation
-      // إذا كان external → url_launcher
-    }
   }
 }

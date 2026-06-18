@@ -4,9 +4,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/core/utils/device_info.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/data/models/auth_state_model.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/domain/entities/user.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/profile_setup_screen.dart';
 import '../../domain/usecases/check_auth_state_usecase.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -35,10 +38,10 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
   Timer? _timer;
   int _checkCount = 0;
   bool _isChecking = false;
-  bool _autoLoginTriggered = false; // ✅ منع تكرار تسجيل الدخول
+  bool _autoLoginTriggered = false;
 
-  static const int maxChecks = 20; // 20 محاولة (حوالي 20 دقيقة)
-  static const int pollIntervalSeconds = 60; // كل 60 ثانية
+  static const int maxChecks = 20;
+  static const int pollIntervalSeconds = 60;
 
   late final CheckAuthStateUseCase _checkAuthStateUseCase;
 
@@ -77,16 +80,37 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
 
       if (_checkCount >= maxChecks && mounted && !_autoLoginTriggered) {
         timer.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'انتهت مهلة الانتظار. يرجى تسجيل الدخول لاحقاً أو التواصل مع الدعم.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 5),
-          ),
-        );
+        _showTimeoutDialog();
       }
     });
+  }
+
+  void _showTimeoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('انتهت مهلة الانتظار'),
+        content: const Text(
+          'لم يتم تفعيل اشتراكك خلال المدة المتوقعة.\n'
+          'يرجى التواصل مع الدعم أو المحاولة لاحقاً.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: _logout,
+            child: const Text('تسجيل الخروج'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkCount = 0;
+              _startPeriodicCheck();
+            },
+            child: const Text('إعادة المحاولة'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkAuthState() async {
@@ -134,15 +158,12 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
     switch (stateCode) {
       case 'SUBSCRIPTION_INACTIVE':
       case 'NEEDS_SUBSCRIPTION':
-        // Still waiting for subscription activation
         print('⏳ Still waiting for subscription activation...');
         break;
 
       case 'UNAPPROVED_DEVICE':
-        // ✅ Subscription is active! Need to login to register device with admin
         if (!_autoLoginTriggered) {
-          print(
-              '✅ Subscription activated! Triggering auto-login to register device...');
+          print('✅ Subscription activated! Triggering auto-login...');
           _timer?.cancel();
           _autoLoginTriggered = true;
 
@@ -154,15 +175,12 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                 duration: Duration(seconds: 2),
               ),
             );
-
-            // ✅ Auto-login to register device with admin
             _performAutoLogin();
           }
         }
         break;
 
       case 'ACTIVE':
-        // ✅ Fully active! Device is already approved
         if (!_autoLoginTriggered) {
           print('✅ Already active! Auto-login to home...');
           _timer?.cancel();
@@ -219,16 +237,13 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Authenticated) {
-            // ✅ Login successful - navigate based on state
             print('✅ Auto-login successful! User is authenticated');
             _timer?.cancel();
 
-            // Navigate to home (the home screen will handle redirection if needed)
-            Navigator.pushReplacementNamed(context, '/home');
+            // ✅ التحقق من اكتمال البروفايل محلياً
+            _checkProfileCompletionAndNavigate(state.user);
           } else if (state is PendingDeviceApproval) {
-            // ✅ Navigate to device approval screen
-            print(
-                '📱 Device pending approval - navigating to device approval screen');
+            print('📱 Device pending approval - navigating to device approval');
             _timer?.cancel();
 
             Navigator.pushReplacement(
@@ -249,8 +264,6 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                 backgroundColor: Colors.red,
               ),
             );
-
-            // If auto-login failed, reset flag
             _autoLoginTriggered = false;
             setState(() {});
           }
@@ -261,7 +274,6 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ✅ أيقونة الانتظار
                 Container(
                   width: 120,
                   height: 120,
@@ -281,8 +293,6 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                         ),
                 ),
                 const SizedBox(height: 30),
-
-                // ✅ عنوان الشاشة
                 Text(
                   'في انتظار تفعيل الاشتراك',
                   style: TextStyle(
@@ -292,16 +302,12 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // ✅ رسالة الحالة
                 Text(
                   widget.message,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 16, height: 1.5),
                 ),
                 const SizedBox(height: 8),
-
-                // ✅ البريد الإلكتروني
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -321,8 +327,6 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // ✅ مؤشر التقدم
                 Container(
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.symmetric(vertical: 8),
@@ -358,10 +362,7 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // ✅ أيقونة التنبيه
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -375,7 +376,8 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'سيتم تفعيل اشتراكك قريباً من قبل المشرف.\nسيتم تسجيل الدخول تلقائياً عند التفعيل.',
+                          'سيتم تفعيل اشتراكك قريباً من قبل المشرف.\n'
+                          'سيتم تسجيل الدخول تلقائياً عند التفعيل.',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.amber.shade800,
@@ -385,10 +387,7 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
-                // ✅ زر التحقق اليدوي
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -417,8 +416,6 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // ✅ زر تسجيل الخروج
                 TextButton.icon(
                   onPressed: _logout,
                   icon: const Icon(Icons.logout),
@@ -431,5 +428,44 @@ class _PendingSubscriptionScreenState extends State<PendingSubscriptionScreen> {
         ),
       ),
     );
+  }
+
+  /// ✅ التحقق من اكتمال البروفايل والتنقل المناسب
+  Future<void> _checkProfileCompletionAndNavigate(User user) async {
+    try {
+      final secureStorage = getIt.get<SecureStorageService>();
+      final profileCompleted =
+          await secureStorage.read(key: 'profile_completed');
+
+      // ✅ التحقق من اكتمال البيانات أيضاً
+      final hasCompleteData = user.currentWeight != null &&
+          user.targetWeight != null &&
+          user.height != null &&
+          user.patientSegment.isNotEmpty &&
+          user.patientSegment != 'general' &&
+          user.phone != null &&
+          user.phone!.isNotEmpty;
+
+      if (profileCompleted == 'true' && hasCompleteData) {
+        // ✅ الانتقال إلى الصفحة الرئيسية
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // ✅ الانتقال إلى صفحة إكمال البروفايل
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ProfileSetupScreen(),
+          ),
+        );
+      }
+    } catch (e) {
+      print('⚠️ Error checking profile completion: $e');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ProfileSetupScreen(),
+        ),
+      );
+    }
   }
 }

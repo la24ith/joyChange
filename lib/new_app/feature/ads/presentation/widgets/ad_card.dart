@@ -6,10 +6,17 @@ class AdCard extends StatelessWidget {
   final Ad ad;
   final VoidCallback onTap;
 
+  /// نص زر "اعرف أكثر"، قابل للتمرير من الخارج. تركناه بقيمة افتراضية
+  /// عربية للحفاظ على نفس السلوك الحالي دون كسر أي استخدام موجود،
+  /// لكنه أصبح جاهزاً لاستبداله بـ tr('ads.learn_more') أو ما يعادلها
+  /// فور إضافة حزمة ترجمة (easy_localization / intl) للمشروع.
+  final String learnMoreLabel;
+
   const AdCard({
     super.key,
     required this.ad,
     required this.onTap,
+    this.learnMoreLabel = 'اعرف أكثر',
   });
 
   @override
@@ -42,7 +49,7 @@ class AdCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (ad.imageUrl != null)
+                if (ad.imageUrl != null && ad.imageUrl!.isNotEmpty)
                   CachedNetworkImage(
                     imageUrl: ad.imageUrl!,
                     fit: BoxFit.cover,
@@ -53,6 +60,9 @@ class AdCard extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
+                    // إذا فشل تحميل الصورة (مثل رابط غير قابل للوصول من
+                    // السيرفر) نعرض خلفية متدرجة بديلة بدل ترك مساحة
+                    // فاضية أو رمي خطأ يظهر للمستخدم.
                     errorWidget: (_, __, ___) => _buildGradientBackground(),
                   )
                 else
@@ -109,9 +119,9 @@ class AdCard extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        child: const Text(
-                          'اعرف أكثر',
-                          style: TextStyle(
+                        child: Text(
+                          learnMoreLabel,
+                          style: const TextStyle(
                             color: Colors.teal,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,

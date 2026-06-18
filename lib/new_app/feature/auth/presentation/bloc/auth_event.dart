@@ -94,15 +94,18 @@ final class LogoutEvent extends AuthEvent {}
 final class ClearAuthErrorEvent extends AuthEvent {}
 // في auth_event.dart
 
+/// Event to start subscription polling
 final class StartSubscriptionPollingEvent extends AuthEvent {
   final String email;
   const StartSubscriptionPollingEvent({required this.email});
 }
 
+/// Event to start device polling
 final class StartDevicePollingEvent extends AuthEvent {
   final String email;
   final String deviceId;
   const StartDevicePollingEvent({required this.email, required this.deviceId});
 }
 
+/// Event to stop polling
 final class StopPollingEvent extends AuthEvent {}

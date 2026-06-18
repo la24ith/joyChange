@@ -41,7 +41,13 @@ class User extends Equatable {
 
   /// Helper to check if user has completed their profile
   bool get hasCompleteProfile {
-    return currentWeight != null && height != null && targetWeight != null;
+    return currentWeight != null &&
+        targetWeight != null &&
+        height != null &&
+        patientSegment.isNotEmpty &&
+        patientSegment != 'general' &&
+        phone != null &&
+        phone!.isNotEmpty;
   }
 
   /// Helper to calculate BMI (if height and current weight available)

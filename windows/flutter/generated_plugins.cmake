@@ -10,6 +10,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_timezone
   screen_retriever_windows
   secure_application
+  url_launcher_windows
   window_manager
 )
 
