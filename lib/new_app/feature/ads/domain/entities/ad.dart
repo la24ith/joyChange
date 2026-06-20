@@ -11,6 +11,8 @@ class Ad extends Equatable {
   final String title;
   final String content;
   final String? imageUrl;
+  final String? image;
+
   final AdType type;
   final String? linkUrl;
   final LinkType linkType;
@@ -26,6 +28,7 @@ class Ad extends Equatable {
     required this.title,
     required this.content,
     this.imageUrl,
+    this.image,
     required this.type,
     this.linkUrl,
     required this.linkType,

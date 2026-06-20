@@ -222,12 +222,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     print('✅ ProfileCompletedEvent received for user: ${event.user.email}');
 
-    // ✅ تحديث الحالة إلى Authenticated مع المستخدم المحدث
-    emit(Authenticated(
-      user: event.user,
-      token: '',
-      hasActiveSubscription: true,
-    ));
+    // ✅ إعادة التحقق من الجلسة بالكامل
+    // هذا سيؤدي إلى تحميل المستخدم المحدث من التخزين المحلي
+    add(CheckSessionEvent());
   }
 
   // ============================================================

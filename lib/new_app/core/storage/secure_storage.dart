@@ -13,8 +13,10 @@ class SecureStorageService {
       : _storage = const FlutterSecureStorage(aOptions: _androidOptions);
 
   Future<void> write({required String key, required String value}) async {
-    print(
-        '💾 SecureStorage write: key=$key, value=${value.substring(0, 20)}...');
+    // ✅ إصلاح: التحقق من طول القيمة قبل عرضها
+    final displayValue =
+        value.length > 20 ? '${value.substring(0, 20)}...' : value;
+    print('💾 SecureStorage write: key=$key, value=$displayValue');
     await _storage.write(key: key, value: value);
     print('✅ SecureStorage write completed');
   }
@@ -23,7 +25,10 @@ class SecureStorageService {
     final value = await _storage.read(key: key);
     print('🔍 SecureStorage read: key=$key, found=${value != null}');
     if (value != null) {
-      print('🔍 Value: ${value.substring(0, 20)}...');
+      // ✅ إصلاح: التحقق من طول القيمة قبل عرضها
+      final displayValue =
+          value.length > 20 ? '${value.substring(0, 20)}...' : value;
+      print('🔍 Value: $displayValue');
     }
     return value;
   }

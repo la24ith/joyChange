@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 import '../../domain/entities/ad.dart';
 
 class AdCard extends StatelessWidget {
   final Ad ad;
   final VoidCallback onTap;
 
-  /// نص زر "اعرف أكثر"، قابل للتمرير من الخارج. تركناه بقيمة افتراضية
-  /// عربية للحفاظ على نفس السلوك الحالي دون كسر أي استخدام موجود،
-  /// لكنه أصبح جاهزاً لاستبداله بـ tr('ads.learn_more') أو ما يعادلها
-  /// فور إضافة حزمة ترجمة (easy_localization / intl) للمشروع.
   final String learnMoreLabel;
 
   const AdCard({
@@ -51,7 +48,7 @@ class AdCard extends StatelessWidget {
               children: [
                 if (ad.imageUrl != null && ad.imageUrl!.isNotEmpty)
                   CachedNetworkImage(
-                    imageUrl: ad.imageUrl!,
+                    imageUrl: ApiEndpoints.getFullMediaUrl(ad.image!),
                     fit: BoxFit.cover,
                     placeholder: (_, __) => Container(
                       color:

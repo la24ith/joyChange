@@ -6,6 +6,7 @@ class AdModel extends Ad {
     required super.title,
     required super.content,
     super.imageUrl,
+    super.image,
     required super.type,
     super.linkUrl,
     required super.linkType,
@@ -26,6 +27,7 @@ class AdModel extends Ad {
       // هذا الرابط (دومين غير صحيح، عدم وجود الصورة) تُعالج بصرياً في
       // AdCard عبر errorWidget، وليست خطأ في التحليل (parsing) هنا.
       imageUrl: json['image_url'] as String?,
+      image: json['image'] as String?,
       type: _parseType(json['type'] as String?),
       linkUrl: json['link_url'] as String?,
       linkType: _parseLinkType(json['link_type'] as String?),
@@ -91,6 +93,7 @@ class AdModel extends Ad {
       'title': title,
       'content': content,
       'image_url': imageUrl,
+      'image': image,
       'type': type.name,
       'link_url': linkUrl,
       'link_type': linkType.name,
@@ -109,6 +112,7 @@ class AdModel extends Ad {
       title: title,
       content: content,
       imageUrl: imageUrl,
+      image: image,
       type: type,
       linkUrl: linkUrl,
       linkType: linkType,
