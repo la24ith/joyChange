@@ -24,12 +24,13 @@ class NavigationScreen extends StatelessWidget {
         BlocProvider<WeightBloc>.value(
           value: getIt<WeightBloc>()..add(LoadWeightsEvent()),
         ),
-        BlocProvider<DrawerBloc>.value(
-          value: getIt<DrawerBloc>()..add(LoadUserSubscriptionEvent()),
+        BlocProvider<DrawerBloc>(
+          create: (context) =>
+              getIt<DrawerBloc>()..add(LoadUserSubscriptionEvent()),
         ),
         // ✅ استخدام value بدلاً من create
-        BlocProvider<NotificationBloc>.value(
-          value: getIt<NotificationBloc>(),
+        BlocProvider<NotificationBloc>(
+          create: (context) => getIt<NotificationBloc>(),
         ),
       ],
       child: const _NavigationView(),

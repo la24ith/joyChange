@@ -1,5 +1,4 @@
 // lib/features/weight_tracking/data/datasources/weight_remote_ds.dart
-
 import 'package:dio/dio.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/domain/entities/weight_goal_status.dart';
@@ -15,12 +14,34 @@ class WeightRemoteDataSource {
   WeightRemoteDataSource({DioClient? dioClient})
       : _dioClient = dioClient ?? DioClient.instance;
 
-  Future<List<WeightEntryModel>> getWeights() async {
+  // ==================== GET WEIGHTS WITH ETAG ====================
+  Future<List<WeightEntryModel>> getWeights({String? etag}) async {
     try {
-      final response = await _dioClient.get(ApiEndpoints.weights);
+      final options = Options(
+        headers: {
+          if (etag != null) 'If-None-Match': etag,
+        },
+      );
+
+      final response = await _dioClient.get(
+        ApiEndpoints.weights,
+        options: options,
+      );
+
+      // 304 Not Modified - استخدام الكاش
+      if (response.statusCode == 304) {
+        throw const CacheNotModifiedException();
+      }
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> data = response.data['data'];
+
+        // حفظ ETag من الـ Response
+        final newEtag = response.headers['etag']?.first;
+        if (newEtag != null) {
+          // سيتم حفظه في الـ Repository
+        }
+
         return data.map((json) => WeightEntryModel.fromJson(json)).toList();
       } else {
         throw ServerException(
@@ -37,6 +58,7 @@ class WeightRemoteDataSource {
     }
   }
 
+  // ==================== GET WEIGHT STATS ====================
   Future<WeightStatsModel> getWeightStats() async {
     try {
       final response = await _dioClient.get(ApiEndpoints.weightStats);
@@ -58,6 +80,7 @@ class WeightRemoteDataSource {
     }
   }
 
+  // ==================== GET WEIGHT CHART ====================
   Future<WeightChartModel> getWeightChart() async {
     try {
       final response = await _dioClient.get(ApiEndpoints.weightChart);
@@ -79,6 +102,7 @@ class WeightRemoteDataSource {
     }
   }
 
+  // ==================== GET IDEAL WEIGHT STATUS ====================
   Future<WeightGoalStatus> getIdealWeightStatus() async {
     try {
       final response = await _dioClient.get(ApiEndpoints.weightIdealStatus);
@@ -100,6 +124,7 @@ class WeightRemoteDataSource {
     }
   }
 
+  // ==================== ADD WEIGHT ENTRY ====================
   Future<void> addWeightEntry(double weight, DateTime date,
       {String? notes}) async {
     try {
@@ -126,4 +151,34 @@ class WeightRemoteDataSource {
       );
     }
   }
+
+  // ==================== BATCH GET ALL DATA ====================
+  Future<Map<String, dynamic>> getAllWeightData() async {
+    try {
+      final results = await Future.wait([
+        _dioClient.get(ApiEndpoints.weights),
+        _dioClient.get(ApiEndpoints.weightStats),
+        _dioClient.get(ApiEndpoints.weightChart),
+        _dioClient.get(ApiEndpoints.weightIdealStatus),
+      ]);
+
+      return {
+        'weights': results[0].data['data'] as List,
+        'stats': results[1].data,
+        'chart': results[2].data,
+        'status': results[3].data,
+        'etag': results[0].headers['etag']?.first,
+      };
+    } catch (e) {
+      throw ServerException(
+        message: 'Failed to load all data: ${e.toString()}',
+        statusCode: null,
+      );
+    }
+  }
+}
+
+// استثناء مخصص لـ 304 Not Modified
+class CacheNotModifiedException implements Exception {
+  const CacheNotModifiedException();
 }

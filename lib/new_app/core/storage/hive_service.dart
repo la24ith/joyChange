@@ -1,6 +1,7 @@
 // lib/core/storage/hive_service.dart
 
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
 import 'package:path_provider/path_provider.dart';
 import '../constant/storage_keys.dart';
 
@@ -24,10 +25,21 @@ class HiveService {
   }
 
   Future<void> _openBoxes() async {
-    await Hive.openBox(StorageKeys.postsBox);
-    await Hive.openBox(StorageKeys.weightsBox);
-    await Hive.openBox(StorageKeys.dailyAnswersBox);
-    await Hive.openBox(StorageKeys.syncQueueBox);
+    if (!Hive.isBoxOpen(StorageKeys.postsBox)) {
+      await Hive.openBox(StorageKeys.postsBox);
+    }
+    if (!Hive.isBoxOpen(StorageKeys.weightsBox)) {
+      await Hive.openBox(StorageKeys.weightsBox);
+    }
+    if (!Hive.isBoxOpen(StorageKeys.dailyCommitmentBox)) {
+      await Hive.openBox(StorageKeys.dailyCommitmentBox);
+    }
+    if (!Hive.isBoxOpen(StorageKeys.syncQueueBox)) {
+      await Hive.openBox(StorageKeys.syncQueueBox);
+    }
+    if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
+      await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+    }
   }
 
   // Generic get box

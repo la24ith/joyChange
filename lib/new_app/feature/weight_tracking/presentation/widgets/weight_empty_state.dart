@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 
 class WeightEmptyState extends StatelessWidget {
-  final VoidCallback onAddPressed;
 
-  const WeightEmptyState({super.key, required this.onAddPressed});
+
+  const WeightEmptyState({super.key,});
 
   @override
   Widget build(BuildContext context) {
@@ -51,21 +51,7 @@ class WeightEmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: onAddPressed,
-              icon: const Icon(Icons.add),
-              label: const Text('إضافة قياس'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
+         ],
         ),
       ),
     );

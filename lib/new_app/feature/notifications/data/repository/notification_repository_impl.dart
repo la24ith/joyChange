@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/domain/entities/repository/notification_repository.dart';
 
 import '../datasource/notification_api_service.dart';
@@ -39,7 +39,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
   @override
   Stream<List<NotificationHiveModel>> watchNotifications() {
     final box = Hive.box<NotificationHiveModel>(
-      notificationsBox,
+      StorageKeys.notificationsBox,
     );
 
     return box.watch().asyncMap(

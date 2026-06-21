@@ -93,26 +93,6 @@ class _DrawerContent extends StatelessWidget {
                             //    _navigateToPage(context, MenuItem.home),
                             ),
                         DrawerMenuItem(
-                            item: MenuItem.weights,
-                            isSelected: selectedItem == MenuItem.weights,
-                            onTap: () => {}
-                            //  _navigateToPage(context, MenuItem.weights),
-                            ),
-                        const Divider(height: 24, thickness: 1),
-                        DrawerMenuItem(
-                            item: MenuItem.diabetes,
-                            isSelected: selectedItem == MenuItem.diabetes,
-                            onTap: () {}
-                            //    _navigateToPage(context, MenuItem.diabetes),
-                            ),
-                        DrawerMenuItem(
-                            item: MenuItem.cubs,
-                            isSelected: selectedItem == MenuItem.cubs,
-                            onTap: () {}
-                            //   _navigateToPage(context, MenuItem.cubs),
-                            ),
-                        const Divider(height: 24, thickness: 1),
-                        DrawerMenuItem(
                           item: MenuItem.logout,
                           isSelected: false,
                           onTap: () => _showLogoutDialog(context),

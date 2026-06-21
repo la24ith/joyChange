@@ -5,7 +5,7 @@ class AppConstants {
   static String baseUrl = 'https://lake-oaf-reappear.ngrok-free.dev';
 
   // App Information
-  static const String appName = 'Patient Weight Tracker';
+  static const String appName = 'متعة التغير';
   static const String appVersion = '1.0.0';
 
   // Feature Flags

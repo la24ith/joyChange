@@ -8,11 +8,21 @@ import '../../domain/entities/daily_question.dart';
 import '../../domain/entities/daily_answer.dart';
 import '../../domain/entities/daily_stats.dart';
 import '../datasources/daily_commitment_remote_ds.dart';
+import '../datasources/daily_commitment_local_ds.dart';
+import '../models/local_commitment_data.dart';
 
 class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
   final DailyCommitmentRemoteDataSource remoteDataSource;
+  final DailyCommitmentLocalDataSource localDataSource;
 
-  DailyCommitmentRepositoryImpl({required this.remoteDataSource});
+  DailyCommitmentRepositoryImpl({
+    required this.remoteDataSource,
+    required this.localDataSource,
+  });
+
+  // ============================================================================
+  // 🌐 Remote Methods
+  // ============================================================================
 
   @override
   Future<Either<Failure, DailyQuestion>> getTodayQuestion() async {
@@ -88,5 +98,81 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
         message: 'Failed to load stats: ${e.toString()}',
       ));
     }
+  }
+
+  // ============================================================================
+  // 💾 Local Methods
+  // ============================================================================
+
+  @override
+  Future<LocalCommitmentData> getLocalData() async {
+    return await localDataSource.getCachedData();
+  }
+
+  @override
+  Future<void> saveLocalData(LocalCommitmentData data) async {
+    await localDataSource.saveData(data);
+  }
+
+  @override
+  Future<void> savePendingAnswer({
+    required String answer,
+    required DateTime date,
+    String? notes,
+  }) async {
+    await localDataSource.savePendingAnswer(
+      answer: answer,
+      date: date,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getPendingAnswers() async {
+    return await localDataSource.getPendingAnswers();
+  }
+
+  @override
+  Future<void> clearPendingAnswers() async {
+    await localDataSource.clearPendingAnswers();
+  }
+
+  @override
+  Future<void> removePendingAnswer(int index) async {
+    await localDataSource.removePendingAnswer(index);
+  }
+
+  @override
+  Future<void> syncPendingAnswers() async {
+    final pending = await localDataSource.getPendingAnswers();
+    if (pending.isEmpty) return;
+
+    print('🔄 Syncing ${pending.length} pending answers...');
+
+    for (var i = 0; i < pending.length; i++) {
+      final answerData = pending[i];
+      try {
+        await remoteDataSource.submitAnswer(
+          answer: answerData['answer'],
+          date: DateTime.parse(answerData['date']),
+          notes: answerData['notes'],
+        );
+        await localDataSource.removePendingAnswer(i);
+        print('✅ Pending answer synced successfully');
+      } catch (e) {
+        print('❌ Failed to sync pending answer: $e');
+        // Stop syncing if one fails, will retry later
+        break;
+      }
+    }
+
+    // Update sync status
+    final localData = await localDataSource.getCachedData();
+    await localDataSource.saveData(localData.markAsSynced());
+  }
+
+  @override
+  Future<void> clearAllLocalData() async {
+    await localDataSource.clearAll();
   }
 }

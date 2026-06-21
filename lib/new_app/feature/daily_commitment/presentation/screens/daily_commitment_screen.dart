@@ -126,7 +126,7 @@ class _DailyCommitmentViewState extends State<_DailyCommitmentView> {
             }
 
             if (state is DailyCommitmentLoaded) {
-              final question = state.question.question;
+              final question = state.question;
               final isAnswered = state.answeredToday;
 
               return SafeArea(

@@ -37,16 +37,22 @@ final class DailyCommitmentError extends DailyCommitmentState {
 }
 
 final class DailyCommitmentLoaded extends DailyCommitmentState {
-  final DailyQuestion question;
+  final String question;
   final DailyStats stats;
   final List<DailyAnswer> history;
   final bool answeredToday;
+  final String? todayAnswer;
+  final bool isFromCache;
+  final bool isSynced;
 
   const DailyCommitmentLoaded({
     required this.question,
     required this.stats,
     required this.history,
     required this.answeredToday,
+    this.todayAnswer,
+    this.isFromCache = false,
+    this.isSynced = true,
   });
 
   @override
@@ -55,5 +61,8 @@ final class DailyCommitmentLoaded extends DailyCommitmentState {
         stats,
         history,
         answeredToday,
+        todayAnswer,
+        isFromCache,
+        isSynced,
       ];
 }

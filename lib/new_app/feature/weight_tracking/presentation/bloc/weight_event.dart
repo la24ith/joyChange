@@ -1,5 +1,4 @@
 // lib/features/weight_tracking/presentation/bloc/weight_event.dart
-
 import 'package:equatable/equatable.dart';
 
 abstract class WeightEvent extends Equatable {
@@ -9,12 +8,21 @@ abstract class WeightEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadWeightsEvent extends WeightEvent {}
+class LoadWeightsEvent extends WeightEvent {
+  final bool forceRefresh;
+
+  const LoadWeightsEvent({this.forceRefresh = false});
+
+  @override
+  List<Object?> get props => [forceRefresh];
+}
 
 class RefreshWeightsEvent extends WeightEvent {}
 
 class FetchWeightData extends WeightEvent {
-  const FetchWeightData();
+  final bool forceRefresh;
+
+  const FetchWeightData({this.forceRefresh = false});
 }
 
 class AddWeightEvent extends WeightEvent {
@@ -31,3 +39,7 @@ class AddWeightEvent extends WeightEvent {
   @override
   List<Object?> get props => [weight, date, notes];
 }
+
+class ClearCacheEvent extends WeightEvent {}
+
+class GetCacheInfoEvent extends WeightEvent {}

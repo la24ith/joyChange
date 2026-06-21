@@ -1,12 +1,15 @@
-// lib/main.dart
+// lib/main.dart (معدل)
+
+import 'package:device_preview/device_preview.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:joy_of_change_v3/firebase_options.dart';
-import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/services/local_notification_service.dart';
 import 'package:joy_of_change_v3/new_app/core/services/timezone_service.dart';
@@ -35,47 +38,80 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ تهيئة Firebase بأمان
   try {
+    // ✅ تهيئة Firebase بأمان
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-  } catch (e) {
-    debugPrint('Firebase init error: $e');
+  } catch (e, stackTrace) {
+    debugPrint('🔥 Firebase init error: $e');
+    debugPrint('📚 StackTrace: $stackTrace');
   }
 
-  await Hive.initFlutter();
+  try {
+    // ============================================================================
+    // ✅ 1. تهيئة Hive
+    // ============================================================================
+    await Hive.initFlutter();
 
-  Hive.registerAdapter(NotificationHiveModelAdapter());
+    // ✅ تسجيل Adapters
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(NotificationHiveModelAdapter());
+    }
 
-  await Hive.openBox<NotificationHiveModel>(notificationsBox);
+    // ============================================================================
+    // ✅ 2. تهيئة Service Locator
+    // ============================================================================
+    await setupServiceLocator();
 
-  await TimezoneService.initialize();
+    // ============================================================================
+    // ✅ 3. إصلاح حالة البروفايل
+    // ============================================================================
+    await _fixProfileStatus();
 
-  final notificationPlugin = await LocalNotificationInitializer.init();
-  await notificationPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.requestNotificationsPermission();
+    // ============================================================================
+    // ✅ 4. باقي التهيئة
+    // ============================================================================
+    await TimezoneService.initialize();
 
-  await registerNotificationSync();
-  await setupServiceLocator();
-  // lib/main.dart - بعد setupServiceLocator()
+    final notificationPlugin = await LocalNotificationInitializer.init();
+    await notificationPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
 
-// ✅ ✅ ✅ إصلاح تلقائي لحالة البروفايل
+    await registerNotificationSync();
+
+    // ✅ تخزين الـ plugin
+    getIt
+        .registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
+  } catch (e, stackTrace) {
+    debugPrint('❌ Fatal initialization error: $e');
+    debugPrint('📚 StackTrace: $stackTrace');
+    // يمكن إعادة المحاولة أو عرض شاشة خطأ
+  }
+
+  runApp(
+    const MyApp(),
+  );
+}
+
+// ============================================================================
+// ✅ Helper Functions
+// ============================================================================
+
+Future<void> _fixProfileStatus() async {
   try {
     final secureStorage = getIt.get<SecureStorageService>();
     final authRepo = getIt.get<AuthRepository>();
 
-    // ✅ قراءة المستخدم المحفوظ
     final user = await authRepo.getStoredUser();
 
     if (user != null) {
       print('👤 Found user: ${user.email}');
 
-      // ✅ التحقق من اكتمال البيانات
       final hasCompleteData = user.currentWeight != null &&
           user.targetWeight != null &&
           user.height != null &&
@@ -87,16 +123,13 @@ void main() async {
       print('📊 Has complete data: $hasCompleteData');
 
       if (hasCompleteData) {
-        // ✅ قراءة الحالة الحالية
         final current = await secureStorage.read(key: 'profile_completed');
         print('🔍 Current profile_completed: "$current"');
 
-        // ✅ إذا كانت الحالة غير صحيحة، قم بإصلاحها
         if (current != 'true') {
           await secureStorage.write(key: 'profile_completed', value: 'true');
           print('✅ Auto-fixed profile status for: ${user.email}');
 
-          // ✅ تحقق من الإصلاح
           final fixed = await secureStorage.read(key: 'profile_completed');
           print('🔍 After fix: "$fixed"');
         } else {
@@ -104,19 +137,21 @@ void main() async {
         }
       } else {
         print('⚠️ User data incomplete, profile setup needed');
+        // ✅ التأكد من أن الحالة false
+        await secureStorage.write(key: 'profile_completed', value: 'false');
       }
     } else {
       print('⚠️ No user found in storage');
     }
-  } catch (e) {
-    print('⚠️ Auto-fix attempt failed: $e');
+  } catch (e, stackTrace) {
+    print('❌ Error fixing profile status: $e');
+    print('📚 StackTrace: $stackTrace');
   }
-
-  // ✅ تخزين الـ plugin في service locator
-  getIt.registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
-
-  runApp(const MyApp());
 }
+
+// ============================================================================
+// ✅ MyApp
+// ============================================================================
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -135,13 +170,13 @@ class MyApp extends StatelessWidget {
         BlocProvider<HomeBloc>(
           create: (context) => getIt<HomeBloc>(),
         ),
-        BlocProvider<NotificationBloc>.value(
-          value: getIt<NotificationBloc>()
+        BlocProvider<NotificationBloc>(
+          create: (context) => getIt<NotificationBloc>()
             ..add(LoadNotifications())
             ..add(SyncNotifications()),
         ),
-        BlocProvider<WeightBloc>.value(
-          value: getIt<WeightBloc>()..add(LoadWeightsEvent()),
+        BlocProvider<WeightBloc>(
+          create: (context) => getIt<WeightBloc>()..add(LoadWeightsEvent()),
         ),
       ],
       child: GetMaterialApp(
@@ -165,12 +200,18 @@ class MyApp extends StatelessWidget {
           GetPage(name: '/login', page: () => const LoginScreen()),
           GetPage(name: '/home', page: () => const NavigationScreen()),
           GetPage(
-              name: '/profile-setup', page: () => const ProfileSetupScreen()),
+            name: '/profile-setup',
+            page: () => const ProfileSetupScreen(),
+          ),
         ],
       ),
     );
   }
 }
+
+// ============================================================================
+// ✅ SplashScreen (معدل)
+// ============================================================================
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -187,46 +228,55 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkConnectivity();
+    // ✅ استخدام addPostFrameCallback للتأكد من وجود context
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkConnectivity();
+    });
   }
 
   Future<void> _checkConnectivity() async {
-    // ✅ التحقق من الاتصال
-    final connectivityResult = await Connectivity().checkConnectivity();
-    _isConnected = connectivityResult != ConnectivityResult.none;
+    if (!mounted) return;
 
-    if (!_isConnected) {
-      // ✅ وضع عدم الاتصال - عرض البيانات المحفوظة
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      _isConnected = connectivityResult != ConnectivityResult.none;
+
+      if (!_isConnected) {
+        setState(() {
+          _statusMessage =
+              'لا يوجد اتصال بالإنترنت\nجاري عرض البيانات المحفوظة...';
+          _isChecking = false;
+        });
+        await _checkCachedSession();
+      } else {
+        setState(() {
+          _statusMessage = 'جاري التحقق من الجلسة...';
+        });
+        _retryCheckSession();
+      }
+    } catch (e) {
+      print('⚠️ Connectivity check error: $e');
       setState(() {
-        _statusMessage =
-            'لا يوجد اتصال بالإنترنت\nجاري عرض البيانات المحفوظة...';
+        _isConnected = false;
         _isChecking = false;
+        _statusMessage =
+            'فشل التحقق من الاتصال\nجاري استخدام البيانات المحفوظة';
       });
-
-      // ✅ محاولة التحقق من الجلسة المحفوظة
       await _checkCachedSession();
-    } else {
-      // ✅ يوجد اتصال - التحقق من الجلسة
-      setState(() {
-        _statusMessage = 'جاري التحقق من الجلسة...';
-      });
-
-      // ✅ إعادة التحقق من الجلسة
-      _retryCheckSession();
     }
   }
 
   Future<void> _checkCachedSession() async {
+    if (!mounted) return;
+
     try {
       final authRepository = getIt.get<AuthRepository>();
       final token = await authRepository.getStoredToken();
       final user = await authRepository.getStoredUser();
 
       if (token != null && token.isNotEmpty && user != null) {
-        // ✅ يوجد جلسة محفوظة - انتقل للصفحة المناسبة
-        _navigateBasedOnProfile(user);
+        await _navigateBasedOnProfile(user);
       } else {
-        // ✅ لا توجد جلسة محفوظة - انتقل لتسجيل الدخول
         _navigateToLogin();
       }
     } catch (e) {
@@ -235,45 +285,39 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  void _navigateBasedOnProfile(User user) {
-    // ✅ التحقق من اكتمال البروفايل
-    final hasCompleteData = user.currentWeight != null &&
-        user.targetWeight != null &&
-        user.height != null &&
-        user.patientSegment.isNotEmpty &&
-        user.patientSegment != 'general' &&
-        user.phone != null &&
-        user.phone!.isNotEmpty;
+  Future<void> _navigateBasedOnProfile(User user) async {
+    if (!mounted) return;
 
-    // ✅ التحقق من حالة الإكمال في SecureStorage
-    _checkProfileCompletionAndNavigate(user, hasCompleteData);
+    final isComplete = await _isProfileComplete(user);
+    if (isComplete) {
+      if (mounted) {
+        Get.offAllNamed('/home');
+      }
+    } else {
+      if (mounted) {
+        Get.offAllNamed('/profile-setup');
+      }
+    }
   }
 
-  Future<void> _checkProfileCompletionAndNavigate(
-      User user, bool hasCompleteData) async {
+  Future<bool> _isProfileComplete(User user) async {
     try {
       final secureStorage = getIt.get<SecureStorageService>();
       final profileCompleted =
           await secureStorage.read(key: 'profile_completed');
 
-      if (profileCompleted == 'true' && hasCompleteData) {
-        // ✅ البروفايل مكتمل - انتقل للصفحة الرئيسية
-        if (mounted) {
-          Get.offAllNamed('/home');
-        }
-      } else {
-        // ✅ البروفايل غير مكتمل - انتقل لصفحة الإكمال
-        if (mounted) {
-          Get.offAllNamed('/profile-setup');
-        }
-      }
+      final hasCompleteData = user.currentWeight != null &&
+          user.targetWeight != null &&
+          user.height != null &&
+          user.patientSegment.isNotEmpty &&
+          user.patientSegment != 'general' &&
+          user.phone != null &&
+          user.phone!.isNotEmpty;
+
+      return profileCompleted == 'true' && hasCompleteData;
     } catch (e) {
       print('⚠️ Error checking profile completion: $e');
-      if (hasCompleteData) {
-        if (mounted) Get.offAllNamed('/home');
-      } else {
-        if (mounted) Get.offAllNamed('/profile-setup');
-      }
+      return false;
     }
   }
 
@@ -284,26 +328,35 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _retryCheckSession() {
-    // ✅ إعادة التحقق من الجلسة
-    final authBloc = context.read<AuthBloc>();
-    authBloc.add(CheckSessionEvent());
+    if (mounted) {
+      try {
+        final authBloc = context.read<AuthBloc>();
+        authBloc.add(CheckSessionEvent());
+      } catch (e) {
+        print('⚠️ Error reading AuthBloc: $e');
+        setState(() {
+          _isChecking = false;
+          _statusMessage = 'حدث خطأ، يرجى المحاولة مرة أخرى';
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
+        if (!mounted) return;
+
         setState(() {
           _isChecking = false;
         });
 
         if (state is Authenticated) {
-          // ✅ تحقق من اكتمال البروفايل قبل الانتقال
           _handleAuthenticated(state.user);
         } else if (state is Unauthenticated) {
           _navigateToLogin();
         } else if (state is AuthError) {
-          // ✅ في حالة الخطأ، حاول استخدام البيانات المحفوظة
           _handleAuthError(state.message);
         } else if (state is LoginLoading) {
           setState(() {
@@ -311,7 +364,6 @@ class _SplashScreenState extends State<SplashScreen> {
             _statusMessage = 'جاري التحقق من الجلسة...';
           });
         } else if (state is ProfileIncomplete) {
-          // ✅ حالة البروفايل غير مكتمل
           if (mounted) {
             Get.offAllNamed('/profile-setup');
           }
@@ -319,67 +371,55 @@ class _SplashScreenState extends State<SplashScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // ✅ أيقونة الاتصال
-              _isConnected
-                  ? const Icon(
-                      Icons.wifi,
-                      size: 48,
-                      color: Colors.teal,
-                    )
-                  : Icon(
-                      Icons.wifi_off,
-                      size: 48,
-                      color: Colors.orange.shade700,
-                    ),
-              const SizedBox(height: 24),
-
-              // ✅ مؤشر التحميل
-              _isChecking
-                  ? const CircularProgressIndicator(color: Colors.teal)
-                  : Icon(
-                      _isConnected ? Icons.check_circle : Icons.warning_amber,
-                      color: _isConnected ? Colors.green : Colors.orange,
-                      size: 40,
-                    ),
-              const SizedBox(height: 24),
-
-              // ✅ رسالة الحالة
-              Text(
-                _statusMessage,
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 16),
-
-              // ✅ زر إعادة المحاولة (عند الخطأ أو عدم الاتصال)
-              if (!_isConnected)
-                TextButton(
-                  onPressed: _checkConnectivity,
-                  child: const Text(
-                    'إعادة المحاولة',
-                    style: TextStyle(color: Colors.teal),
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _isConnected
+                    ? const Icon(Icons.wifi, size: 48, color: Colors.teal)
+                    : Icon(
+                        Icons.wifi_off,
+                        size: 48,
+                        color: Colors.orange.shade700,
+                      ),
+                const SizedBox(height: 24),
+                _isChecking
+                    ? const CircularProgressIndicator(color: Colors.teal)
+                    : Icon(
+                        _isConnected ? Icons.check_circle : Icons.warning_amber,
+                        color: _isConnected ? Colors.green : Colors.orange,
+                        size: 40,
+                      ),
+                const SizedBox(height: 24),
+                Text(
+                  _statusMessage,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 14,
+                    height: 1.5,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-
-              // ✅ زر إعادة المحاولة عند الخطأ
-              if (!_isChecking && _isConnected)
-                TextButton(
-                  onPressed: _retryCheckSession,
-                  child: const Text(
-                    'إعادة التحقق',
-                    style: TextStyle(color: Colors.teal),
+                const SizedBox(height: 16),
+                if (!_isConnected)
+                  TextButton(
+                    onPressed: _checkConnectivity,
+                    child: const Text(
+                      'إعادة المحاولة',
+                      style: TextStyle(color: Colors.teal),
+                    ),
                   ),
-                ),
-            ],
+                if (!_isChecking && _isConnected)
+                  TextButton(
+                    onPressed: _retryCheckSession,
+                    child: const Text(
+                      'إعادة التحقق',
+                      style: TextStyle(color: Colors.teal),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -387,21 +427,11 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _handleAuthenticated(User user) async {
+    if (!mounted) return;
+
     try {
-      final secureStorage = getIt.get<SecureStorageService>();
-      final profileCompleted =
-          await secureStorage.read(key: 'profile_completed');
-
-      // ✅ التحقق من اكتمال البيانات
-      final hasCompleteData = user.currentWeight != null &&
-          user.targetWeight != null &&
-          user.height != null &&
-          user.patientSegment.isNotEmpty &&
-          user.patientSegment != 'general' &&
-          user.phone != null &&
-          user.phone!.isNotEmpty;
-
-      if (profileCompleted == 'true' && hasCompleteData) {
+      final isComplete = await _isProfileComplete(user);
+      if (isComplete) {
         if (mounted) {
           Get.offAllNamed('/home');
         }
@@ -419,24 +449,23 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _handleAuthError(String message) async {
+    if (!mounted) return;
+
     print('⚠️ Auth error: $message');
 
-    // ✅ محاولة استخدام البيانات المحفوظة في حالة الخطأ
     try {
       final authRepository = getIt.get<AuthRepository>();
       final token = await authRepository.getStoredToken();
       final user = await authRepository.getStoredUser();
 
       if (token != null && token.isNotEmpty && user != null) {
-        // ✅ توجد بيانات محفوظة - استخدمها
-        _navigateBasedOnProfile(user);
+        await _navigateBasedOnProfile(user);
         return;
       }
     } catch (e) {
       print('⚠️ Error getting cached data: $e');
     }
 
-    // ✅ في حالة عدم وجود بيانات محفوظة
     if (mounted) {
       Get.offAllNamed('/login');
       Get.snackbar(

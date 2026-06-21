@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/services/notification_sync_service.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
@@ -25,7 +25,7 @@ void callbackDispatcher() {
         Hive.registerAdapter(NotificationHiveModelAdapter());
       }
 
-      await Hive.openBox<NotificationHiveModel>(notificationsBox);
+      await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
       await setupServiceLocator();
 
       if (task == 'notification_sync_task') {

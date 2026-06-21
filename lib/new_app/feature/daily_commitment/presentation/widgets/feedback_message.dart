@@ -23,10 +23,11 @@ class FeedbackMessage extends StatelessWidget {
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeOutBack,
       builder: (context, value, child) {
+        final safeOpacity = value.clamp(0.0, 1.0);
         return Opacity(
-          opacity: value,
+          opacity: safeOpacity,
           child: Transform.scale(
-            scale: value,
+            scale: safeOpacity,
             child: child,
           ),
         );

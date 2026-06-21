@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
-import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/widgets/animation_button.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/screens/notifications_screen.dart';
@@ -98,7 +98,7 @@ class HomeHeader extends StatelessWidget {
 
   Widget buildNotificationButton() {
     final box = Hive.box<NotificationHiveModel>(
-      notificationsBox,
+      StorageKeys.notificationsBox,
     );
 
     return ValueListenableBuilder(

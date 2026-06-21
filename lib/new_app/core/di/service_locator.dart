@@ -1,8 +1,10 @@
+// lib/new_app/core/di/service_locator.dart
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/services/notification_scheduler_service.dart';
 import 'package:joy_of_change_v3/new_app/core/services/notification_sync_service.dart';
 import 'package:joy_of_change_v3/new_app/feature/ads/data/datasources/ads_remote_ds.dart';
@@ -23,13 +25,18 @@ import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/logout_use
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/register_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_bloc.dart';
+import 'package:joy_of_change_v3/new_app/feature/daily_commitment/data/datasources/daily_commitment_local_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/data/datasources/daily_commitment_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/data/repositories/daily_commitment_repository_impl.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/repositories/aily_commitment_repository.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/get_answer_history_usecase.dart';
+import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/get_local_data_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/get_stats_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/get_today_question_usecase.dart';
+import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/save_local_data_usecase.dart';
+import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/save_pending_answer_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/submit_answer_usecase.dart';
+import 'package:joy_of_change_v3/new_app/feature/daily_commitment/domain/usecases/sync_pending_answers_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/daily_commitment/presentation/bloc/daily_commitment_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/data/datasources/subscription_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/data/repositories/subscription_repository_impl.dart';
@@ -43,6 +50,7 @@ import 'package:joy_of_change_v3/new_app/feature/home/domain/usecases/get_posts_
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/data/datasources/post_remote_ds.dart';
+import 'package:joy_of_change_v3/new_app/feature/weight_tracking/data/datasources/weight_local_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/data/datasources/weight_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/data/repositories/weight_repository_impl.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/domain/repositories/weight_repository.dart';
@@ -67,7 +75,13 @@ final getIt = GetIt.instance;
 
 Future<void> setupServiceLocator() async {
   // ============================================================================
-  // Core Services (Singleton)
+  // ✅ 1. تهيئة SharedPreferences أولاً
+  // ============================================================================
+  final sharedPreferences = await SharedPreferences.getInstance();
+  getIt.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+
+  // ============================================================================
+  // ✅ 2. Core Services (Singleton)
   // ============================================================================
 
   getIt.registerLazySingleton<FlutterSecureStorage>(
@@ -80,26 +94,49 @@ Future<void> setupServiceLocator() async {
   );
   getIt.registerLazySingleton<DioClient>(() => DioClient.instance);
 
-  await getIt<HiveService>().init();
+  // ============================================================================
+  // ✅ 3. فتح Hive Boxes
+  // ============================================================================
+  try {
+    await getIt<HiveService>().init();
 
-  if (!Hive.isBoxOpen('user_box')) {
-    await Hive.openBox('user_box');
-  }
-  if (!Hive.isBoxOpen('posts_box')) {
-    await Hive.openBox('posts_box');
+    if (!Hive.isBoxOpen('user_box')) {
+      await Hive.openBox('user_box');
+    }
+    if (!Hive.isBoxOpen('posts_box')) {
+      await Hive.openBox('posts_box');
+    }
+    if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
+      await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+    }
+  } catch (e) {
+    print('❌ Error opening Hive boxes: $e');
+    // محاولة فتح الصناديق بشكل منفصل في حالة الفشل
+    try {
+      if (!Hive.isBoxOpen('user_box')) {
+        await Hive.openBox('user_box');
+      }
+    } catch (_) {}
+    try {
+      if (!Hive.isBoxOpen('posts_box')) {
+        await Hive.openBox('posts_box');
+      }
+    } catch (_) {}
+    try {
+      if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
+        await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+      }
+    } catch (_) {}
   }
 
   final userBox = Hive.box('user_box');
 
   // ============================================================================
-  // Auth Data Layer
+  // ✅ 4. Auth Data Layer
   // ============================================================================
 
   getIt.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSource(dioClient: getIt<DioClient>()),
-  );
-  getIt.registerLazySingleton<CheckAuthStateUseCase>(
-    () => CheckAuthStateUseCase(getIt<AuthRepository>()),
   );
   getIt.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSource(
@@ -114,7 +151,7 @@ Future<void> setupServiceLocator() async {
   );
 
   // ============================================================================
-  // Auth Domain Layer
+  // ✅ 5. Auth Domain Layer
   // ============================================================================
 
   getIt.registerLazySingleton<LoginUseCase>(
@@ -130,8 +167,12 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<UpdateProfileUseCase>(
     () => UpdateProfileUseCase(getIt<AuthRepository>()),
   );
+  getIt.registerLazySingleton<CheckAuthStateUseCase>(
+    () => CheckAuthStateUseCase(getIt<AuthRepository>()),
+  );
+
   // ============================================================================
-  // Auth Presentation Layer
+  // ✅ 6. Auth Presentation Layer
   // ============================================================================
 
   getIt.registerFactory<AuthBloc>(
@@ -145,14 +186,16 @@ Future<void> setupServiceLocator() async {
   );
 
   // ============================================================================
-  // Home Feature
+  // ✅ 7. Home Feature
   // ============================================================================
 
   getIt.registerLazySingleton<HomeRemoteDataSource>(
     () => HomeRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
-  getIt.registerLazySingleton<HomeLocalDataSource>(() => HomeLocalDataSource());
+  getIt.registerLazySingleton<HomeLocalDataSource>(
+    () => HomeLocalDataSource(),
+  );
 
   getIt.registerLazySingleton<HomeRepository>(
     () => HomeRepositoryImpl(
@@ -167,7 +210,7 @@ Future<void> setupServiceLocator() async {
       () => HomeBloc(getPostsUseCase: getIt<GetPostsUseCase>()));
 
   // ============================================================================
-  // Post Details Feature
+  // ✅ 8. Post Details Feature
   // ============================================================================
 
   getIt.registerLazySingleton<PostRemoteDataSource>(
@@ -175,74 +218,27 @@ Future<void> setupServiceLocator() async {
   );
 
   // ============================================================================
-  // ✅ Weight Feature
+  // ✅ 9. Daily Commitment Feature
   // ============================================================================
 
-  // Initialize Weight Local Data Source
-  /* await WeightLocalDataSource.instance.init();
-
-  // Data Sources
-  getIt.registerLazySingleton<WeightRemoteDataSource>(
-    () => WeightRemoteDataSource(dioClient: getIt<DioClient>()),
-  );
-
-  getIt.registerLazySingleton<WeightLocalDataSource>(
-    () => WeightLocalDataSource.instance,
-  );
-
-  // Repository
-  getIt.registerLazySingleton<WeightRepository>(
-    () => WeightRepositoryImpl(
-      remoteDataSource: getIt<WeightRemoteDataSource>(),
-      localDataSource: getIt<WeightLocalDataSource>(),
-    ),
-  );
-
-  // Use Cases
-  getIt.registerLazySingleton<GetWeightStatsUseCase>(
-    () => GetWeightStatsUseCase(getIt<WeightRepository>()),
-  );
-
-  getIt.registerLazySingleton<GetWeightStatusUseCase>(
-    () => GetWeightStatusUseCase(getIt<WeightRepository>()),
-  );
-
-  getIt.registerLazySingleton<GetWeightHistoryUseCase>(
-    () => GetWeightHistoryUseCase(getIt<WeightRepository>()),
-  );
-
-  getIt.registerLazySingleton<AddWeightEntryUseCase>(
-    () => AddWeightEntryUseCase(getIt<WeightRepository>()),
-  );
-
-  // ✅ Bloc
-  getIt.registerFactory<WeightBloc>(
-    () => WeightBloc(
-      getWeightStatsUseCase: getIt<GetWeightStatsUseCase>(),
-      getWeightStatusUseCase: getIt<GetWeightStatusUseCase>(),
-      getWeightHistoryUseCase: getIt<GetWeightHistoryUseCase>(),
-      addWeightEntryUseCase: getIt<AddWeightEntryUseCase>(),
-    ),
-  );*/
-
-  // ============================================================================
-  // طباعة للتأكد
-  // ============================================================================
-
-  print('✅ Service Locator initialized');
+  // Initialize Local Data Source
+  await DailyCommitmentLocalDataSource.instance.init();
 
   getIt.registerLazySingleton<DailyCommitmentRemoteDataSource>(
     () => DailyCommitmentRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
-// Repository
+  getIt.registerLazySingleton<DailyCommitmentLocalDataSource>(
+    () => DailyCommitmentLocalDataSource.instance,
+  );
+
   getIt.registerLazySingleton<DailyCommitmentRepository>(
     () => DailyCommitmentRepositoryImpl(
       remoteDataSource: getIt<DailyCommitmentRemoteDataSource>(),
+      localDataSource: getIt<DailyCommitmentLocalDataSource>(),
     ),
   );
 
-// Use Cases
   getIt.registerLazySingleton<GetTodayQuestionUseCase>(
     () => GetTodayQuestionUseCase(getIt<DailyCommitmentRepository>()),
   );
@@ -259,28 +255,46 @@ Future<void> setupServiceLocator() async {
     () => SubmitAnswerUseCase(getIt<DailyCommitmentRepository>()),
   );
 
-// BLoC
+  getIt.registerLazySingleton<GetLocalDataUseCase>(
+    () => GetLocalDataUseCase(getIt<DailyCommitmentRepository>()),
+  );
+
+  getIt.registerLazySingleton<SaveLocalDataUseCase>(
+    () => SaveLocalDataUseCase(getIt<DailyCommitmentRepository>()),
+  );
+
+  getIt.registerLazySingleton<SavePendingAnswerUseCase>(
+    () => SavePendingAnswerUseCase(getIt<DailyCommitmentRepository>()),
+  );
+
+  getIt.registerLazySingleton<SyncPendingAnswersUseCase>(
+    () => SyncPendingAnswersUseCase(getIt<DailyCommitmentRepository>()),
+  );
+
   getIt.registerFactory<DailyCommitmentBloc>(
     () => DailyCommitmentBloc(
       getStatsUseCase: getIt<GetStatsUseCase>(),
       getAnswerHistoryUseCase: getIt<GetAnswerHistoryUseCase>(),
       submitAnswerUseCase: getIt<SubmitAnswerUseCase>(),
+      getLocalDataUseCase: getIt<GetLocalDataUseCase>(),
+      saveLocalDataUseCase: getIt<SaveLocalDataUseCase>(),
+      savePendingAnswerUseCase: getIt<SavePendingAnswerUseCase>(),
+      syncPendingAnswersUseCase: getIt<SyncPendingAnswersUseCase>(),
     ),
   );
 
-// ============================================================================
+  // ============================================================================
+  // ✅ 10. Ads Feature
+  // ============================================================================
 
-// Data Sources
   getIt.registerLazySingleton<AdsRemoteDataSource>(
     () => AdsRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
-// Repository
   getIt.registerLazySingleton<AdsRepository>(
     () => AdsRepositoryImpl(remoteDataSource: getIt<AdsRemoteDataSource>()),
   );
 
-// Use Cases
   getIt.registerLazySingleton<GetActiveAdsUseCase>(
     () => GetActiveAdsUseCase(getIt<AdsRepository>()),
   );
@@ -289,7 +303,6 @@ Future<void> setupServiceLocator() async {
     () => RegisterClickUseCase(getIt<AdsRepository>()),
   );
 
-// BLoC
   getIt.registerFactory<AdsBloc>(
     () => AdsBloc(
       getActiveAdsUseCase: getIt<GetActiveAdsUseCase>(),
@@ -297,22 +310,29 @@ Future<void> setupServiceLocator() async {
     ),
   );
 
-// ============================================================================
-// Weight Tracking Feature
-// ============================================================================
+  // ============================================================================
+  // ✅ 11. Weight Tracking Feature (تم الإصلاح)
+  // ============================================================================
 
-// Data Sources
+  // ✅ تسجيل WeightLocalDataSource مع SharedPreferences
+  getIt.registerLazySingleton<WeightLocalDataSource>(
+    () => WeightLocalDataSource(getIt<SharedPreferences>()),
+  );
+
+  // ✅ تسجيل WeightRemoteDataSource
   getIt.registerLazySingleton<WeightRemoteDataSource>(
     () => WeightRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
-// Repository
+  // ✅ تسجيل WeightRepository
   getIt.registerLazySingleton<WeightRepository>(
-    () =>
-        WeightRepositoryImpl(remoteDataSource: getIt<WeightRemoteDataSource>()),
+    () => WeightRepositoryImpl(
+      remoteDataSource: getIt<WeightRemoteDataSource>(),
+      localDataSource: getIt<WeightLocalDataSource>(),
+    ),
   );
 
-// Use Cases
+  // ✅ تسجيل Use Cases
   getIt.registerLazySingleton<GetWeightsUseCase>(
     () => GetWeightsUseCase(getIt<WeightRepository>()),
   );
@@ -333,7 +353,7 @@ Future<void> setupServiceLocator() async {
     () => AddWeightUseCase(getIt<WeightRepository>()),
   );
 
-// BLoC
+  // ✅ تسجيل WeightBloc
   getIt.registerFactory<WeightBloc>(
     () => WeightBloc(
       getWeightsUseCase: getIt<GetWeightsUseCase>(),
@@ -344,11 +364,12 @@ Future<void> setupServiceLocator() async {
     ),
   );
 
-  // ==========================
-  // Notifications
-  // ==========================
+  // ============================================================================
+  // ✅ 12. Notifications Feature
+  // ============================================================================
 
-  final notificationBox = Hive.box<NotificationHiveModel>(notificationsBox);
+  final notificationBox =
+      Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
 
   getIt.registerLazySingleton<NotificationApiService>(
     () => NotificationApiService(
@@ -386,7 +407,10 @@ Future<void> setupServiceLocator() async {
     () => NotificationBloc(getIt<NotificationRepository>()),
   );
 
-  // Drawer Feature
+  // ============================================================================
+  // ✅ 13. Drawer Feature
+  // ============================================================================
+
   getIt.registerLazySingleton<SubscriptionRemoteDataSource>(
     () => SubscriptionRemoteDataSource(dioClient: getIt<DioClient>()),
   );
@@ -402,6 +426,8 @@ Future<void> setupServiceLocator() async {
       subscriptionRepository: getIt<SubscriptionRepository>(),
     ),
   );
+
+  print('✅ Service Locator initialized successfully!');
 }
 
 void resetServiceLocator() {

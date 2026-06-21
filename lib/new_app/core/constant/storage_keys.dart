@@ -27,5 +27,11 @@ class StorageKeys {
   static const String isOfflineMode = 'is_offline_mode';
   static const String pendingSyncCount = 'pending_sync_count';
 
+  // Daily Commitment
+  static const String dailyCommitmentBox = 'daily_commitment_box';
+
+  static const String dailyCommitmentData = 'daily_commitment_data';
+  static const String dailyCommitmentPending = 'daily_commitment_pending';
+
   // Shared Preferences Keys
 }
