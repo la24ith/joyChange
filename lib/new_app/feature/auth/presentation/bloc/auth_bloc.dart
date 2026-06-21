@@ -20,6 +20,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final CheckSubscriptionUseCase _checkSubscriptionUseCase;
   final CheckSessionUseCase _checkSessionUseCase;
   final RegisterUseCase _registerUseCase;
+  bool _isLoggingOut = false; // ✅ منع التكرار
 
   Timer? _pollingTimer;
   int _pollingCount = 0;
@@ -371,12 +372,35 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutEvent event,
     Emitter<AuthState> emit,
   ) async {
-    _pollingTimer?.cancel();
-    await _authRepository.logout();
-    emit(const LoggedOut());
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!isClosed) emit(const Unauthenticated());
-    });
+    // ✅ منع التنفيذ المتكرر
+    if (_isLoggingOut) {
+      print('⚠️ Logout already in progress, skipping...');
+      return;
+    }
+    _isLoggingOut = true;
+
+    try {
+      // ✅ إيقاف الـ Polling
+      _pollingTimer?.cancel();
+      _pollingTimer = null;
+      _pollingCount = 0;
+
+      // ✅ محاولة تسجيل الخروج من API (مع تجاهل الأخطاء)
+      try {
+        await _authRepository.logout();
+      } catch (e) {
+        print('⚠️ Logout API error (ignored): $e');
+      }
+
+      // ✅ إرسال الحالة النهائية
+      emit(const Unauthenticated());
+    } catch (e) {
+      print('❌ Logout error: $e');
+      // ✅ في حالة أي خطأ، ننظف الحالة
+      emit(const Unauthenticated());
+    } finally {
+      _isLoggingOut = false;
+    }
   }
 
   void _onClearError(

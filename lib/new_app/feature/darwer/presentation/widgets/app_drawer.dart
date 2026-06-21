@@ -2,10 +2,13 @@
 
 import 'package:flutter/material.dart' hide DrawerHeader;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:go_router/go_router.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_event.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/login_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/data/models/drawer_models.dart';
 import 'package:joy_of_change_v3/new_app/feature/darwer/domain/repositories/subscription_repository.dart';
 import '../bloc/drawer_bloc.dart';
@@ -44,7 +47,7 @@ class _DrawerContent extends StatelessWidget {
         if (state is DrawerLogoutSuccess) {
           // ✅ تسجيل الخروج من AuthBloc أيضاً
           context.read<AuthBloc>().add(LogoutEvent());
-          context.go('/login');
+          Get.offAll(() => const LoginScreen());
         }
         if (state is DrawerError) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -117,11 +120,11 @@ class _DrawerContent extends StatelessWidget {
     context.read<DrawerBloc>().add(SelectMenuItemEvent(selectedItem: item));
 
     // الانتقال إلى الصفحة المطلوبة
-    context.push(item.route);
+    Get.offAll(item.route);
 
     // إغلاق الـ Drawer بعد التنقل
     if (context.mounted) {
-      Navigator.pop(context);
+      Get.back();
     }
   }
 
