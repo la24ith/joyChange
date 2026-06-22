@@ -23,6 +23,7 @@ import '../widgets/offline_indicator.dart';
 import '../widgets/home_header.dart';
 import '../widgets/ideal_weight_card.dart';
 import '../widgets/sync_status.dart';
+import '../widgets/subscription_expiry_warning.dart'; // ✅ إضافة الاستيراد
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -131,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -170,6 +172,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       screenWidth: screenWidth,
                       scaffoldKey: scaffoldKey,
                     ),
+                  ),
+
+                  // ✅ تنبيه انتهاء الاشتراك
+                  SliverToBoxAdapter(
+                    child: SubscriptionExpiryWarning(screenWidth: screenWidth),
                   ),
 
                   if (_isOffline)
