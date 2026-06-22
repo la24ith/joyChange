@@ -1,6 +1,7 @@
 // lib/features/auth/domain/usecases/check_session_usecase.dart
 
 import 'package:dartz/dartz.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/app_theme.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
@@ -43,12 +44,11 @@ class CheckSessionUseCase {
 
         return subscriptionResult.fold(
           (failure) {
-            // ✅ في حالة فشل التحقق، استخدم البيانات المحفوظة
-            print('⚠️ Subscription check failed, using cached data');
-            return Right(CheckSessionResult(
-              user: user,
-              isProfileComplete: isProfileComplete,
-            ));
+            if (failure is SubscriptionExpiredFailure) {
+              repository.clearLocalAuthData();
+              return Left(failure);
+            }
+            return Left(failure);
           },
           (isActive) {
             if (isActive) {
@@ -57,7 +57,6 @@ class CheckSessionUseCase {
                 isProfileComplete: isProfileComplete,
               ));
             } else {
-              // ✅ الاشتراك غير نشط - احذف الجلسة المحفوظة
               repository.clearLocalAuthData();
               return Left(SubscriptionExpiredFailure(
                 message: 'Your subscription has expired.',
@@ -66,8 +65,16 @@ class CheckSessionUseCase {
           },
         );
       } catch (e) {
-        // ✅ في حالة الخطأ، استخدم البيانات المحفوظة
-        print('⚠️ Error checking session: $e, using cached data');
+        // ✅ الحل: فرّق بين خطأ الـ subscription وأي خطأ آخر
+        if (e.toString().contains('Subscription expired') ||
+            AppState.subscriptionExpired) {
+          repository.clearLocalAuthData();
+          return Left(SubscriptionExpiredFailure(
+            message: 'Your subscription has expired.',
+          ));
+        }
+        // فقط الأخطاء الأخرى (network، timeout) تستخدم البيانات المخبأة
+        print('⚠️ Network error checking session: $e, using cached data');
         return Right(CheckSessionResult(
           user: user,
           isProfileComplete: isProfileComplete,

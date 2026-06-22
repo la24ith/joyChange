@@ -16,20 +16,33 @@ class AuthRemoteDataSource {
 
   Future<bool> checkSubscriptionStatus(String email) async {
     try {
-      final response = await _dioClient.get(ApiEndpoints.subscriptionStatus);
+      final response = await _dioClient.get(
+        ApiEndpoints.subscriptionStatus,
+      );
 
+      // الحالة الطبيعية (200)
       if (response.statusCode == 200 &&
           response.data != null &&
           response.data['success'] == true) {
         final data = response.data['data'];
-        if (data != null && data['active'] != null) {
-          return data['active'] == true;
-        }
+        return data != null && data['active'] == true;
       }
 
-      return response.statusCode == 403 ? true : false;
-    } catch (e) {
-      return true;
+      return false;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+
+      // 🔥 الحالة المهمة: اشتراك منتهي
+      if (e.response?.statusCode == 403 &&
+          data != null &&
+          data['code'] == 'SUBSCRIPTION_INACTIVE') {
+        throw SubscriptionExpiredException(
+          message: data['message'] ?? 'Subscription expired',
+        );
+      }
+
+      // أي خطأ آخر
+      throw Exception('Network or server error');
     }
   }
 

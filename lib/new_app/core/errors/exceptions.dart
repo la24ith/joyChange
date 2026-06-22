@@ -43,9 +43,6 @@ class ForbiddenException extends AppException {
 }
 
 /// Subscription expired (403 with subscription context)
-class SubscriptionExpiredException extends AppException {
-  SubscriptionExpiredException({required super.message, super.statusCode});
-}
 
 /// Device not allowed (403 with device context)
 class DeviceNotAllowedException extends AppException {
@@ -65,4 +62,10 @@ class CacheException extends AppException {
 /// Unknown exception
 class UnknownException extends AppException {
   UnknownException({required super.message, super.statusCode});
+}
+
+class SubscriptionExpiredException implements Exception {
+  final String message;
+
+  SubscriptionExpiredException({required this.message});
 }

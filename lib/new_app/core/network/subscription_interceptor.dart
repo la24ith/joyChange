@@ -23,7 +23,6 @@ class SubscriptionInterceptor extends Interceptor {
           requestOptions: response.requestOptions,
           error: SubscriptionExpiredException(
             message: message ?? 'Your subscription has expired',
-            statusCode: response.statusCode,
           ),
         ),
       );

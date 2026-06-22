@@ -9,6 +9,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:joy_of_change_v3/firebase_options.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/app_theme.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/services/local_notification_service.dart';
@@ -22,6 +24,7 @@ import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_eve
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_state.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/login_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/profile_setup_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subscription_expired_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/ideal_weight_splash_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/navigation_screen.dart';
@@ -350,6 +353,12 @@ class _SplashScreenState extends State<SplashScreen> {
         } else if (state is Unauthenticated) {
           _navigateToLogin();
         } else if (state is AuthError) {
+          if (state.message.contains('subscription') ||
+              state.message.contains('expired') ||
+              AppState.subscriptionExpired) {
+            Get.offAll(() => const SubscriptionExpiredScreen());
+            return;
+          }
           _handleAuthError(state.message);
         } else if (state is LoginLoading) {
           setState(() {

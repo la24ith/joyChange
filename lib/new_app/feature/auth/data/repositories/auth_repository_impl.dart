@@ -128,11 +128,20 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, bool>> checkSubscriptionStatus(String email) async {
     try {
       final isActive = await remoteDataSource.checkSubscriptionStatus(email);
+
       return Right(isActive);
+    } on SubscriptionExpiredException catch (e) {
+      return Left(
+        SubscriptionExpiredFailure(
+          message: e.message,
+        ),
+      );
     } catch (e) {
-      return Left(ServerFailure(
-        message: 'Failed to check subscription status',
-      ));
+      return Left(
+        ServerFailure(
+          message: 'Failed to check subscription status',
+        ),
+      );
     }
   }
 

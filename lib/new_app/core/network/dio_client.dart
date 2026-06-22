@@ -1,8 +1,12 @@
 // lib/core/network/dio_client.dart
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:get/route_manager.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_constants.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/app_theme.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subscription_expired_screen.dart';
 import 'auth_interceptor.dart';
 import 'error_interceptor.dart';
 import 'subscription_interceptor.dart';
@@ -39,25 +43,33 @@ class DioClient {
       ),
     );
   }
-  // lib/core/network/dio_client.dart
 
+  // lib/core/network/dio_client.dart
   void _setupInterceptors() {
     _dio.interceptors.clear();
 
-    // ✅ أضف logging interceptor أولاً
     _dio.interceptors.add(
-      LogInterceptor(
-        request: true,
-        requestHeader: true,
-        requestBody: true,
-        responseHeader: true,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => print('🌐 DIO: $obj'),
+      InterceptorsWrapper(
+        onError: (error, handler) {
+          final data = error.response?.data;
+
+          if (error.response?.statusCode == 403 &&
+              data != null &&
+              data['code'] == "SUBSCRIPTION_INACTIVE") {
+            AppState.subscriptionExpired = true;
+
+            // ✅ الحل: استخدم Future.microtask لضمان التنفيذ بعد اكتمال البناء
+            Future.microtask(() {
+              Get.offAll(() => const SubscriptionExpiredScreen());
+            });
+
+            return handler.next(error);
+          }
+
+          return handler.next(error);
+        },
       ),
     );
-
-    // ✅ AuthInterceptor (الذي يستخدم SecureStorageService)
     _dio.interceptors.add(AuthInterceptor());
     _dio.interceptors.add(ErrorInterceptor());
   }
@@ -73,6 +85,9 @@ class DioClient {
     CancelToken? cancelToken,
     ProgressCallback? onReceiveProgress,
   }) async {
+    if (AppState.subscriptionExpired) {
+      throw Exception("Subscription expired - request blocked");
+    }
     try {
       final response = await _dio.get(
         path,
@@ -97,6 +112,9 @@ class DioClient {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
+    if (AppState.subscriptionExpired) {
+      throw Exception("Subscription expired - request blocked");
+    }
     try {
       final response = await _dio.post(
         path,
