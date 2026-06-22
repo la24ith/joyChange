@@ -10,7 +10,7 @@ class NotificationSchedulerService {
   NotificationSchedulerService(this.plugin);
 
   Future<void> scheduleNotification(NotificationHiveModel notification) async {
-    if (notification.isScheduled) {
+    if (notification.isScheduled!) {
       debugPrint('⏭️ Notification ${notification.id} already scheduled');
       return;
     }
@@ -48,7 +48,7 @@ class NotificationSchedulerService {
       }
 
       await plugin.zonedSchedule(
-        notification.id,
+        notification.id!,
         notification.title,
         notification.message,
         tz.TZDateTime.from(scheduleDate, tz.local),
@@ -70,7 +70,7 @@ class NotificationSchedulerService {
   Future<void> showNow(NotificationHiveModel notification) async {
     try {
       await plugin.show(
-        notification.id,
+        notification.id!,
         notification.title,
         notification.message,
         _details(),

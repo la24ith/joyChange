@@ -114,7 +114,7 @@ class NotificationsView extends StatelessWidget {
                       onDismissed: (_) {
                         context.read<NotificationBloc>().add(
                               DeleteNotificationEvent(
-                                notification.id,
+                                notification.id ?? 0,
                               ),
                             );
                       },
@@ -139,14 +139,14 @@ class NotificationsView extends StatelessWidget {
                                 width: 52,
                                 height: 52,
                                 decoration: BoxDecoration(
-                                  color: notification.isRead
+                                  color: notification.isRead ?? false
                                       ? Colors.grey.shade200
                                       : Colors.teal.withOpacity(.12),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   Icons.notifications,
-                                  color: notification.isRead
+                                  color: notification.isRead ?? false
                                       ? Colors.grey
                                       : Colors.teal,
                                 ),
@@ -160,18 +160,19 @@ class NotificationsView extends StatelessWidget {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            notification.title,
+                                            notification.title ?? '',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 15,
-                                              fontWeight: notification.isRead
-                                                  ? FontWeight.w500
-                                                  : FontWeight.bold,
+                                              fontWeight:
+                                                  notification.isRead ?? false
+                                                      ? FontWeight.w500
+                                                      : FontWeight.bold,
                                             ),
                                           ),
                                         ),
-                                        if (!notification.isRead)
+                                        if (!(notification.isRead ?? false))
                                           Container(
                                             width: 10,
                                             height: 10,
@@ -184,7 +185,7 @@ class NotificationsView extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      notification.message,
+                                      notification.message ?? '',
                                       style: TextStyle(
                                         height: 1.5,
                                         color: Colors.grey.shade700,

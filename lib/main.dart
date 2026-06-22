@@ -1,4 +1,4 @@
-// lib/main.dart (معدل)
+// lib/main.dart
 
 import 'package:device_preview/device_preview.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -52,17 +52,11 @@ void main() async {
 
   try {
     // ============================================================================
-    // ✅ 1. تهيئة Hive
+    // ✅ 1. تسجيل Adapters فقط - NO Hive.initFlutter() هنا!
     // ============================================================================
-    await Hive.initFlutter();
-
-    // ✅ تسجيل Adapters
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(NotificationHiveModelAdapter());
-    }
 
     // ============================================================================
-    // ✅ 2. تهيئة Service Locator
+    // ✅ 2. تهيئة Service Locator (Hive.initFlutter() ستُستدعى من HiveService)
     // ============================================================================
     await setupServiceLocator();
 
@@ -87,10 +81,11 @@ void main() async {
     // ✅ تخزين الـ plugin
     getIt
         .registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
+
+    debugPrint('✅ All initializations completed successfully');
   } catch (e, stackTrace) {
     debugPrint('❌ Fatal initialization error: $e');
     debugPrint('📚 StackTrace: $stackTrace');
-    // يمكن إعادة المحاولة أو عرض شاشة خطأ
   }
 
   runApp(
@@ -110,7 +105,7 @@ Future<void> _fixProfileStatus() async {
     final user = await authRepo.getStoredUser();
 
     if (user != null) {
-      print('👤 Found user: ${user.email}');
+      debugPrint('👤 Found user: ${user.email}');
 
       final hasCompleteData = user.currentWeight != null &&
           user.targetWeight != null &&
@@ -120,32 +115,31 @@ Future<void> _fixProfileStatus() async {
           user.phone != null &&
           user.phone!.isNotEmpty;
 
-      print('📊 Has complete data: $hasCompleteData');
+      debugPrint('📊 Has complete data: $hasCompleteData');
 
       if (hasCompleteData) {
         final current = await secureStorage.read(key: 'profile_completed');
-        print('🔍 Current profile_completed: "$current"');
+        debugPrint('🔍 Current profile_completed: "$current"');
 
         if (current != 'true') {
           await secureStorage.write(key: 'profile_completed', value: 'true');
-          print('✅ Auto-fixed profile status for: ${user.email}');
+          debugPrint('✅ Auto-fixed profile status for: ${user.email}');
 
           final fixed = await secureStorage.read(key: 'profile_completed');
-          print('🔍 After fix: "$fixed"');
+          debugPrint('🔍 After fix: "$fixed"');
         } else {
-          print('✅ Profile status already correct');
+          debugPrint('✅ Profile status already correct');
         }
       } else {
-        print('⚠️ User data incomplete, profile setup needed');
-        // ✅ التأكد من أن الحالة false
+        debugPrint('⚠️ User data incomplete, profile setup needed');
         await secureStorage.write(key: 'profile_completed', value: 'false');
       }
     } else {
-      print('⚠️ No user found in storage');
+      debugPrint('⚠️ No user found in storage');
     }
   } catch (e, stackTrace) {
-    print('❌ Error fixing profile status: $e');
-    print('📚 StackTrace: $stackTrace');
+    debugPrint('❌ Error fixing profile status: $e');
+    debugPrint('📚 StackTrace: $stackTrace');
   }
 }
 
@@ -210,7 +204,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ============================================================================
-// ✅ SplashScreen (معدل)
+// ✅ SplashScreen
 // ============================================================================
 
 class SplashScreen extends StatefulWidget {
@@ -228,7 +222,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ استخدام addPostFrameCallback للتأكد من وجود context
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkConnectivity();
     });
@@ -255,7 +248,7 @@ class _SplashScreenState extends State<SplashScreen> {
         _retryCheckSession();
       }
     } catch (e) {
-      print('⚠️ Connectivity check error: $e');
+      debugPrint('⚠️ Connectivity check error: $e');
       setState(() {
         _isConnected = false;
         _isChecking = false;
@@ -280,7 +273,7 @@ class _SplashScreenState extends State<SplashScreen> {
         _navigateToLogin();
       }
     } catch (e) {
-      print('⚠️ Error checking cached session: $e');
+      debugPrint('⚠️ Error checking cached session: $e');
       _navigateToLogin();
     }
   }
@@ -316,7 +309,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       return profileCompleted == 'true' && hasCompleteData;
     } catch (e) {
-      print('⚠️ Error checking profile completion: $e');
+      debugPrint('⚠️ Error checking profile completion: $e');
       return false;
     }
   }
@@ -333,7 +326,7 @@ class _SplashScreenState extends State<SplashScreen> {
         final authBloc = context.read<AuthBloc>();
         authBloc.add(CheckSessionEvent());
       } catch (e) {
-        print('⚠️ Error reading AuthBloc: $e');
+        debugPrint('⚠️ Error reading AuthBloc: $e');
         setState(() {
           _isChecking = false;
           _statusMessage = 'حدث خطأ، يرجى المحاولة مرة أخرى';
@@ -441,7 +434,7 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       }
     } catch (e) {
-      print('⚠️ Error in _handleAuthenticated: $e');
+      debugPrint('⚠️ Error in _handleAuthenticated: $e');
       if (mounted) {
         Get.offAllNamed('/home');
       }
@@ -451,7 +444,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void _handleAuthError(String message) async {
     if (!mounted) return;
 
-    print('⚠️ Auth error: $message');
+    debugPrint('⚠️ Auth error: $message');
 
     try {
       final authRepository = getIt.get<AuthRepository>();
@@ -463,7 +456,7 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
     } catch (e) {
-      print('⚠️ Error getting cached data: $e');
+      debugPrint('⚠️ Error getting cached data: $e');
     }
 
     if (mounted) {

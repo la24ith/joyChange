@@ -29,8 +29,8 @@ class NavigationScreen extends StatelessWidget {
               getIt<DrawerBloc>()..add(LoadUserSubscriptionEvent()),
         ),
         // ✅ استخدام value بدلاً من create
-        BlocProvider<NotificationBloc>(
-          create: (context) => getIt<NotificationBloc>(),
+        BlocProvider<NotificationBloc>.value(
+          value: getIt<NotificationBloc>()..add(LoadNotifications()),
         ),
       ],
       child: const _NavigationView(),

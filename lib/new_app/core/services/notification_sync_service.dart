@@ -75,7 +75,7 @@ class NotificationSyncService {
 
             if (changed) {
               debugPrint('🔄 Updating notification: ${remote.id}');
-              await scheduler.cancel(hiveModel.id);
+              await scheduler.cancel(hiveModel.id ?? 0);
               hiveModel.isScheduled = false;
               await scheduler.scheduleNotification(hiveModel);
               hiveModel.isScheduled = true;
@@ -93,8 +93,8 @@ class NotificationSyncService {
       final deletedIds = localIds.difference(remoteIds);
       for (final id in deletedIds) {
         debugPrint('🗑️ Deleting notification: $id');
-        await scheduler.cancel(id);
-        await local.deleteNotification(id);
+        await scheduler.cancel(id ?? 0);
+        await local.deleteNotification(id ?? 0);
       }
 
       //----------------------------------
@@ -107,8 +107,8 @@ class NotificationSyncService {
         if (notification.expiresAt != null &&
             notification.expiresAt!.isBefore(now)) {
           debugPrint('⏰ Notification expired: ${notification.id}');
-          await scheduler.cancel(notification.id);
-          await local.deleteNotification(notification.id);
+          await scheduler.cancel(notification.id ?? 0);
+          await local.deleteNotification(notification.id ?? 0);
         }
       }
 

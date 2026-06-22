@@ -3,7 +3,7 @@
 class StorageKeys {
   // Secure Storage Keys
   static const String accessToken = 'access_token';
-  static const String refreshToken = 'refresh_token'; // مستقبلاً لو دعم الـ API
+  static const String refreshToken = 'refresh_token';
   static const String deviceId = 'device_id';
   static const String userId = 'user_id';
   static const String userEmail = 'user_email';
@@ -15,7 +15,8 @@ class StorageKeys {
   static const String notificationsBox = 'notifications_box';
   static const String dailyAnswersBox = 'daily_answers_box';
   static const String syncQueueBox = 'sync_queue_box';
-
+  static const String drawerBox = 'drawer_box';
+  static const String userBox = 'user_box';
   // Shared Preferences Keys (if needed)
   static const String isFirstLaunch = 'is_first_launch';
   static const String lastSubscriptionCheck = 'last_subscription_check';
@@ -29,9 +30,6 @@ class StorageKeys {
 
   // Daily Commitment
   static const String dailyCommitmentBox = 'daily_commitment_box';
-
   static const String dailyCommitmentData = 'daily_commitment_data';
   static const String dailyCommitmentPending = 'daily_commitment_pending';
-
-  // Shared Preferences Keys
 }

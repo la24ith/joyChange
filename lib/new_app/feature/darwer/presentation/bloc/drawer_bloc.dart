@@ -13,7 +13,7 @@ class DrawerBloc extends Bloc<DrawerEvent, DrawerState> {
   final SubscriptionRepository _subscriptionRepository;
   late final StreamSubscription<UserSubscription> _subscriptionStream;
 
-  // ✅ Cache محلي لتخزين آخر البيانات المستلمة
+  // ✅ Cache في الذاكرة للجلسة الحالية
   UserSubscription? _cachedSubscription;
 
   DrawerBloc({required SubscriptionRepository subscriptionRepository})
@@ -31,13 +31,12 @@ class DrawerBloc extends Bloc<DrawerEvent, DrawerState> {
     _subscriptionStream =
         _subscriptionRepository.watchUserSubscription().listen(
       (subscription) {
-        // ✅ تحديث الـ Cache عند استلام بيانات جديدة
         _cachedSubscription = subscription;
         add(SubscriptionUpdatedEvent(subscription: subscription));
       },
       onError: (error) {
-        // في حالة الخطأ، حاول التحميل مرة أخرى
-        add(LoadUserSubscriptionEvent());
+        // عند خطأ في الـ Stream، لا تعيد المحاولة لتجنب حلقة لا نهائية
+        // الـ _onLoadUserSubscription سيتعامل مع الـ Cache
       },
     );
   }
@@ -46,41 +45,49 @@ class DrawerBloc extends Bloc<DrawerEvent, DrawerState> {
     LoadUserSubscriptionEvent event,
     Emitter<DrawerState> emit,
   ) async {
-    // ✅ استراتيجية العرض الفوري:
-    // 1. إذا كان لدينا Cache، أظهره فورًا مع حالة تحميل
-    // 2. إذا لم يكن لدينا Cache، أظهر شاشة تحميل فقط
+    // ✅ الخطوة 1: حاول تحميل الـ Cache المحفوظ من التخزين المحلي (Hive)
+    if (_cachedSubscription == null) {
+      final cachedResult = await _subscriptionRepository.getCachedSubscription();
+      cachedResult?.fold(
+        (_) => null,
+        (subscription) => _cachedSubscription = subscription,
+      );
+    }
 
-    if (_cachedSubscription != null && state is! DrawerLoaded) {
-      // عرض البيانات المخزنة مع مؤشر تحميل
+    // ✅ الخطوة 2: اعرض الـ Cache فوراً إذا وُجد
+    if (_cachedSubscription != null) {
       emit(DrawerLoadingWithCache(
         cachedSubscription: _cachedSubscription,
         selectedItem: MenuItem.home,
       ));
-    } else if (_cachedSubscription == null) {
-      // أول مرة لا يوجد بيانات
+    } else {
       emit(DrawerLoading());
     }
 
-    // ✅ جلب البيانات الجديدة في الخلفية (لا يعطل الـ UI)
+    // ✅ الخطوة 3: اجلب البيانات من الشبكة في الخلفية
     final result = await _subscriptionRepository.getUserSubscription();
 
     result.fold(
       (failure) {
-        // ❌ في حالة الخطأ
+        // ❌ فشل الشبكة
         if (_cachedSubscription != null) {
-          // إذا كان لدينا Cache، استمر في عرضه
+          // ✅ عرض الـ Cache المحفوظ بدلاً من الخطأ
           emit(DrawerLoaded(
             subscription: _cachedSubscription!,
             selectedItem: MenuItem.home,
           ));
         } else {
-          // لا يوجد Cache، أظهر الخطأ
-          emit(DrawerError(message: failure.message));
+          // لا Cache ولا إنترنت
+          emit(DrawerError(
+            message: 'لا يوجد اتصال بالإنترنت ولا توجد بيانات محفوظة',
+          ));
         }
       },
       (subscription) {
-        // ✅ نجاح التحميل
+        // ✅ نجاح: حدّث الـ Cache وعرض البيانات الجديدة
         _cachedSubscription = subscription;
+        // ✅ خزّن في Hive حتى تبقى بعد إعادة تشغيل التطبيق
+        _subscriptionRepository.cacheSubscription(subscription);
         emit(DrawerLoaded(
           subscription: subscription,
           selectedItem: MenuItem.home,
@@ -95,15 +102,12 @@ class DrawerBloc extends Bloc<DrawerEvent, DrawerState> {
   ) async {
     final currentState = state;
 
-    // حالة البيانات محملة بالكامل
     if (currentState is DrawerLoaded) {
       emit(DrawerLoaded(
         subscription: currentState.subscription,
         selectedItem: event.selectedItem,
       ));
-    }
-    // حالة التحميل مع Cache - نسمح بتغيير الاختيار أيضاً
-    else if (currentState is DrawerLoadingWithCache &&
+    } else if (currentState is DrawerLoadingWithCache &&
         currentState.cachedSubscription != null) {
       emit(DrawerLoadingWithCache(
         cachedSubscription: currentState.cachedSubscription,
@@ -123,6 +127,7 @@ class DrawerBloc extends Bloc<DrawerEvent, DrawerState> {
       (_) {
         // ✅ مسح الـ Cache عند تسجيل الخروج
         _cachedSubscription = null;
+        _subscriptionRepository.clearCachedSubscription();
         emit(DrawerLogoutSuccess());
       },
     );
@@ -132,19 +137,16 @@ class DrawerBloc extends Bloc<DrawerEvent, DrawerState> {
     SubscriptionUpdatedEvent event,
     Emitter<DrawerState> emit,
   ) async {
-    // ✅ تحديث Cache
     _cachedSubscription = event.subscription;
 
     final currentState = state;
 
-    // تحديث الواجهة بناءً على الحالة الحالية
     if (currentState is DrawerLoaded) {
       emit(DrawerLoaded(
         subscription: event.subscription,
         selectedItem: currentState.selectedItem,
       ));
     } else if (currentState is DrawerLoadingWithCache) {
-      // انتقل من حالة التحميل إلى محملة بالكامل
       emit(DrawerLoaded(
         subscription: event.subscription,
         selectedItem: currentState.selectedItem,

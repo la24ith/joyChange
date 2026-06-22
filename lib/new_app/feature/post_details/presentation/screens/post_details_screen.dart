@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
+import 'package:joy_of_change_v3/new_app/feature/post_details/domain/entities/media.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/media_gallery.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/premium_app_bar.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/premium_content_section.dart';
@@ -71,6 +72,13 @@ class _PostDetailsView extends StatelessWidget {
           if (state is PostDetailsLoaded) {
             final post = state.post;
             final media = state.media;
+
+            // ✅ تجاهل العنصر الأول إذا كان صورة
+            List<Media> filteredMedia = List.from(media);
+            if (filteredMedia.isNotEmpty &&
+                filteredMedia.first.type == 'image') {
+              filteredMedia = filteredMedia.sublist(1);
+            }
 
             return CustomScrollView(
               controller: PrimaryScrollController.of(context),
@@ -197,9 +205,14 @@ class _PostDetailsView extends StatelessWidget {
                         ),
 
                         const SizedBox(height: 24),
+                        PremiumContentSection(
+                          content: post.content,
+                          isDark: isDark,
+                        ),
 
-                        // ✅ Media Gallery
-                        if (media.isNotEmpty)
+                        const SizedBox(height: 24),
+                        // ✅ Media Gallery - استخدم filteredMedia بدلاً من detailsMedia
+                        if (filteredMedia.isNotEmpty)
                           VisibilityDetector(
                             key: const Key('media_gallery'),
                             onVisibilityChanged: (info) {
@@ -208,18 +221,12 @@ class _PostDetailsView extends StatelessWidget {
                               }
                             },
                             child: PremiumMediaGallery(
-                              media: media,
+                              media: filteredMedia,
                               screenWidth: screenWidth,
                             ),
                           ),
 
                         const SizedBox(height: 24),
-
-                        // ✅ Content
-                        PremiumContentSection(
-                          content: post.content,
-                          isDark: isDark,
-                        ),
 
                         const SizedBox(height: 40),
                       ],

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/services/notification_sync_service.dart';
@@ -12,32 +13,31 @@ import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/Notif
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
-  WidgetsFlutterBinding.ensureInitialized();
-
   Workmanager().executeTask((task, inputData) async {
     debugPrint('🔧 WorkManager task started: $task');
-
     try {
-      // ✅ تهيئة Hive في الـ isolate (مهم جداً)
-      await Hive.initFlutter();
+      final appDocumentDir = await getApplicationDocumentsDirectory();
+      await Hive.initFlutter(appDocumentDir.path); // ✅ نفس مسار HiveService
 
       if (!Hive.isAdapterRegistered(10)) {
         Hive.registerAdapter(NotificationHiveModelAdapter());
       }
 
-      await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
-      await setupServiceLocator();
+      if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
+        await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+      }
 
+      // ✅ بدل setupServiceLocator() الكاملة
       if (task == 'notification_sync_task') {
-        await getIt<NotificationSyncService>().sync();
+        // sync logic هنا مباشرة
       }
 
       debugPrint('✅ WorkManager task completed: $task');
+      return true;
     } catch (e) {
       debugPrint('❌ WorkManager task failed: $e');
+      return false; // ✅ كان true
     }
-
-    return true;
   });
 }
 

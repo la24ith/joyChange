@@ -13,7 +13,7 @@ class NotificationsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     // ✅ استخدام value وبدون استدعاءات إضافية
     return BlocProvider<NotificationBloc>.value(
-      value: getIt<NotificationBloc>(),
+      value: getIt<NotificationBloc>()..add(LoadNotifications()),
       child: const NotificationsView(),
     );
   }

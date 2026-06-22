@@ -1,4 +1,6 @@
 // lib/new_app/core/di/service_locator.dart
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
@@ -74,11 +76,14 @@ import '../utils/device_info.dart';
 final getIt = GetIt.instance;
 
 Future<void> setupServiceLocator() async {
+  debugPrint('🔄 Starting Service Locator setup...');
+
   // ============================================================================
   // ✅ 1. تهيئة SharedPreferences أولاً
   // ============================================================================
   final sharedPreferences = await SharedPreferences.getInstance();
   getIt.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+  debugPrint('✅ SharedPreferences registered');
 
   // ============================================================================
   // ✅ 2. Core Services (Singleton)
@@ -93,43 +98,44 @@ Future<void> setupServiceLocator() async {
     () => DeviceInfoUtil(secureStorage: getIt<FlutterSecureStorage>()),
   );
   getIt.registerLazySingleton<DioClient>(() => DioClient.instance);
+  debugPrint('✅ Core services registered');
 
   // ============================================================================
-  // ✅ 3. فتح Hive Boxes
+  // ✅ 3. تهيئة HiveService - THIS IS THE ONLY PLACE WHERE Hive.initFlutter() IS CALLED
   // ============================================================================
   try {
     await getIt<HiveService>().init();
-
-    if (!Hive.isBoxOpen('user_box')) {
-      await Hive.openBox('user_box');
-    }
-    if (!Hive.isBoxOpen('posts_box')) {
-      await Hive.openBox('posts_box');
-    }
-    if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
-      await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
-    }
+    debugPrint('✅ HiveService initialized successfully');
   } catch (e) {
-    print('❌ Error opening Hive boxes: $e');
-    // محاولة فتح الصناديق بشكل منفصل في حالة الفشل
-    try {
-      if (!Hive.isBoxOpen('user_box')) {
-        await Hive.openBox('user_box');
-      }
-    } catch (_) {}
-    try {
-      if (!Hive.isBoxOpen('posts_box')) {
-        await Hive.openBox('posts_box');
-      }
-    } catch (_) {}
-    try {
-      if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
-        await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
-      }
-    } catch (_) {}
+    debugPrint('❌ Error initializing HiveService: $e');
+    // ✅ محاولة فتح الصناديق بشكل يدوي في حالة الفشل
+    debugPrint('🔄 Attempting to open boxes manually...');
+    await _openBoxesManually();
   }
 
-  final userBox = Hive.box('user_box');
+  // ✅ الحصول على مراجع الصناديق - فقط نستخدم Hive.box() لأن HiveService فتحها بالفعل
+  Box userBox;
+  Box<NotificationHiveModel> notificationBox;
+
+  try {
+    userBox = Hive.box('user_box');
+    debugPrint('✅ user_box retrieved');
+  } catch (e) {
+    debugPrint('⚠️ user_box not open, opening now...');
+    userBox = await Hive.openBox('user_box');
+    debugPrint('✅ user_box opened');
+  }
+
+  try {
+    notificationBox =
+        Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
+    debugPrint('✅ notification_box retrieved');
+  } catch (e) {
+    debugPrint('⚠️ Notification box not open, opening now...');
+    notificationBox =
+        await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+    debugPrint('✅ notification_box opened');
+  }
 
   // ============================================================================
   // ✅ 4. Auth Data Layer
@@ -149,6 +155,7 @@ Future<void> setupServiceLocator() async {
       localDataSource: getIt<AuthLocalDataSource>(),
     ),
   );
+  debugPrint('✅ Auth layer registered');
 
   // ============================================================================
   // ✅ 5. Auth Domain Layer
@@ -170,6 +177,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<CheckAuthStateUseCase>(
     () => CheckAuthStateUseCase(getIt<AuthRepository>()),
   );
+  debugPrint('✅ Auth usecases registered');
 
   // ============================================================================
   // ✅ 6. Auth Presentation Layer
@@ -184,6 +192,7 @@ Future<void> setupServiceLocator() async {
       registerUseCase: getIt<RegisterUseCase>(),
     ),
   );
+  debugPrint('✅ AuthBloc registered');
 
   // ============================================================================
   // ✅ 7. Home Feature
@@ -208,6 +217,7 @@ Future<void> setupServiceLocator() async {
       () => GetPostsUseCase(getIt<HomeRepository>()));
   getIt.registerFactory<HomeBloc>(
       () => HomeBloc(getPostsUseCase: getIt<GetPostsUseCase>()));
+  debugPrint('✅ Home feature registered');
 
   // ============================================================================
   // ✅ 8. Post Details Feature
@@ -216,6 +226,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<PostRemoteDataSource>(
     () => PostRemoteDataSource(dioClient: getIt<DioClient>()),
   );
+  debugPrint('✅ Post details feature registered');
 
   // ============================================================================
   // ✅ 9. Daily Commitment Feature
@@ -282,6 +293,7 @@ Future<void> setupServiceLocator() async {
       syncPendingAnswersUseCase: getIt<SyncPendingAnswersUseCase>(),
     ),
   );
+  debugPrint('✅ Daily Commitment feature registered');
 
   // ============================================================================
   // ✅ 10. Ads Feature
@@ -309,22 +321,20 @@ Future<void> setupServiceLocator() async {
       registerClickUseCase: getIt<RegisterClickUseCase>(),
     ),
   );
+  debugPrint('✅ Ads feature registered');
 
   // ============================================================================
-  // ✅ 11. Weight Tracking Feature (تم الإصلاح)
+  // ✅ 11. Weight Tracking Feature
   // ============================================================================
 
-  // ✅ تسجيل WeightLocalDataSource مع SharedPreferences
   getIt.registerLazySingleton<WeightLocalDataSource>(
     () => WeightLocalDataSource(getIt<SharedPreferences>()),
   );
 
-  // ✅ تسجيل WeightRemoteDataSource
   getIt.registerLazySingleton<WeightRemoteDataSource>(
     () => WeightRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
-  // ✅ تسجيل WeightRepository
   getIt.registerLazySingleton<WeightRepository>(
     () => WeightRepositoryImpl(
       remoteDataSource: getIt<WeightRemoteDataSource>(),
@@ -332,7 +342,6 @@ Future<void> setupServiceLocator() async {
     ),
   );
 
-  // ✅ تسجيل Use Cases
   getIt.registerLazySingleton<GetWeightsUseCase>(
     () => GetWeightsUseCase(getIt<WeightRepository>()),
   );
@@ -353,7 +362,6 @@ Future<void> setupServiceLocator() async {
     () => AddWeightUseCase(getIt<WeightRepository>()),
   );
 
-  // ✅ تسجيل WeightBloc
   getIt.registerFactory<WeightBloc>(
     () => WeightBloc(
       getWeightsUseCase: getIt<GetWeightsUseCase>(),
@@ -363,13 +371,11 @@ Future<void> setupServiceLocator() async {
       addWeightUseCase: getIt<AddWeightUseCase>(),
     ),
   );
+  debugPrint('✅ Weight Tracking feature registered');
 
   // ============================================================================
   // ✅ 12. Notifications Feature
   // ============================================================================
-
-  final notificationBox =
-      Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
 
   getIt.registerLazySingleton<NotificationApiService>(
     () => NotificationApiService(
@@ -406,6 +412,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<NotificationBloc>(
     () => NotificationBloc(getIt<NotificationRepository>()),
   );
+  debugPrint('✅ Notifications feature registered');
 
   // ============================================================================
   // ✅ 13. Drawer Feature
@@ -426,10 +433,73 @@ Future<void> setupServiceLocator() async {
       subscriptionRepository: getIt<SubscriptionRepository>(),
     ),
   );
+  debugPrint('✅ Drawer feature registered');
 
-  print('✅ Service Locator initialized successfully!');
+  debugPrint('✅ Service Locator initialized successfully!');
+}
+
+// ============================================================================
+// ✅ Helper Functions
+// ============================================================================
+
+Future<void> _openBoxesManually() async {
+  debugPrint('🔄 Opening boxes manually...');
+  try {
+    if (!Hive.isBoxOpen('user_box')) {
+      await Hive.openBox('user_box');
+      debugPrint('✅ user_box opened manually');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening user_box manually: $e');
+  }
+
+  try {
+    if (!Hive.isBoxOpen('posts_box')) {
+      await Hive.openBox('posts_box');
+      debugPrint('✅ posts_box opened manually');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening posts_box manually: $e');
+  }
+
+  try {
+    if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
+      await Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+      debugPrint('✅ notifications_box opened manually');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening notifications_box manually: $e');
+  }
+
+  try {
+    if (!Hive.isBoxOpen(StorageKeys.weightsBox)) {
+      await Hive.openBox(StorageKeys.weightsBox);
+      debugPrint('✅ weights_box opened manually');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening weights_box manually: $e');
+  }
+
+  try {
+    if (!Hive.isBoxOpen(StorageKeys.dailyCommitmentBox)) {
+      await Hive.openBox(StorageKeys.dailyCommitmentBox);
+      debugPrint('✅ dailyCommitment_box opened manually');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening dailyCommitment_box manually: $e');
+  }
+
+  try {
+    if (!Hive.isBoxOpen(StorageKeys.syncQueueBox)) {
+      await Hive.openBox(StorageKeys.syncQueueBox);
+      debugPrint('✅ syncQueue_box opened manually');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening syncQueue_box manually: $e');
+  }
 }
 
 void resetServiceLocator() {
   getIt.reset();
+  debugPrint('🔄 Service Locator reset');
 }

@@ -38,20 +38,26 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Stream<List<NotificationHiveModel>> watchNotifications() {
-    final box = Hive.box<NotificationHiveModel>(
-      StorageKeys.notificationsBox,
-    );
+    final box = Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
 
-    return box.watch().asyncMap(
-      (_) async {
-        return box.values.toList()
-          ..sort(
-            (a, b) => (b.sentAt ?? DateTime(1970)).compareTo(
-              a.sentAt ?? DateTime(1970),
-            ),
-          );
-      },
-    );
+    // ✅ أضف StreamController لإرسال القيم الحالية فور الاشتراك
+    return Stream<List<NotificationHiveModel>>.multi((controller) {
+      // أرسل البيانات الحالية فوراً
+      final current = box.values.toList()
+        ..sort((a, b) =>
+            (b.sentAt ?? DateTime(1970)).compareTo(a.sentAt ?? DateTime(1970)));
+      controller.add(current);
+
+      // ثم استمع للتغييرات
+      final sub = box.watch().listen((_) {
+        final updated = box.values.toList()
+          ..sort((a, b) => (b.sentAt ?? DateTime(1970))
+              .compareTo(a.sentAt ?? DateTime(1970)));
+        controller.add(updated);
+      });
+
+      controller.onCancel = () => sub.cancel();
+    });
   }
 
   @override

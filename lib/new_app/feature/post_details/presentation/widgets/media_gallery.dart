@@ -44,8 +44,15 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
   void initState() {
     super.initState();
     _carouselController = CarouselSliderController();
+
+    // ✅ ترتيب الوسائط وتجاهل العنصر الأول إذا كان صورة
     _sortedMedia = List<Media>.from(widget.media)
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    // ✅ إذا كان العنصر الأول صورة، قم بإزالته
+    if (_sortedMedia.isNotEmpty && _sortedMedia.first.type == MediaType.image) {
+      _sortedMedia.removeAt(0);
+    }
 
     _hasOnlyImages = _sortedMedia.every((m) => m.type == MediaType.image);
 
@@ -105,7 +112,6 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
 
   // ✅ تحويل إلى Widget عادي (غير Future)
   Widget _buildMediaWidget(Media media) {
-    //final secureUrl = UrlHelper.fixSignedMediaUrl(media.url);
     var secureUrl = media.url;
     secureUrl = secureUrl.replaceFirst(
       'http://',

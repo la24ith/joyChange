@@ -24,28 +24,20 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     LoadNotifications event,
     Emitter<NotificationState> emit,
   ) async {
-    emit(NotificationLoading());
+    // ✅ أولاً: اعرض البيانات المحلية فوراً
+    final localData = await repository.getNotifications();
+    emit(NotificationLoaded(localData));
 
+    // ✅ ثانياً: اشترك في التغييرات
     await _notificationsSubscription?.cancel();
-
     _notificationsSubscription = repository.watchNotifications().listen(
       (notifications) {
-        if (!isClosed) {
-          add(NotificationsUpdated(notifications));
-        }
-      },
-      onError: (error) {
-        if (!isClosed) {
-          emit(NotificationError(error.toString()));
-        }
+        if (!isClosed) add(NotificationsUpdated(notifications));
       },
     );
 
-    final notifications = await repository.getNotifications();
-
-    if (!isClosed) {
-      emit(NotificationLoaded(notifications));
-    }
+    // ✅ ثالثاً: sync في الخلفية
+    repository.syncNotifications().catchError((_) {});
   }
 
   Future<void> _onSyncNotifications(

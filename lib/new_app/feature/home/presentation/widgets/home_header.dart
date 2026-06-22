@@ -1,10 +1,13 @@
 // lib/features/home/presentation/widgets/home_header.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/hive_service.dart';
 import 'package:joy_of_change_v3/new_app/core/widgets/animation_button.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/screens/notifications_screen.dart';
@@ -13,6 +16,7 @@ class HomeHeader extends StatelessWidget {
   final String userName;
   final double? screenWidth;
   final GlobalKey<ScaffoldState> scaffoldKey;
+
   const HomeHeader({
     super.key,
     required this.userName,
@@ -97,15 +101,46 @@ class HomeHeader extends StatelessWidget {
   }
 
   Widget buildNotificationButton() {
-    final box = Hive.box<NotificationHiveModel>(
-      StorageKeys.notificationsBox,
-    );
+    // ✅ استخدام HiveService للحصول على الصندوق
+    Box<NotificationHiveModel> box;
+    try {
+      box = getIt<HiveService>().getBox<NotificationHiveModel>(
+        StorageKeys.notificationsBox,
+      );
+    } catch (e) {
+      // ✅ في حالة فشل الحصول على الصندوق، نحاول فتحه
+      debugPrint('⚠️ Error getting notification box: $e');
+      try {
+        if (!Hive.isBoxOpen(StorageKeys.notificationsBox)) {
+          Hive.openBox<NotificationHiveModel>(StorageKeys.notificationsBox);
+        }
+        box = Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
+      } catch (e2) {
+        debugPrint('❌ Failed to open notification box: $e2');
+        // ✅ إرجاع Widget بسيط في حالة الفشل
+        return IconButton(
+          icon: const Icon(
+            Icons.notifications_outlined,
+            size: 28,
+          ),
+          onPressed: () {
+            Get.snackbar(
+              'تنبيه',
+              'غير قادر على تحميل الإشعارات',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.orange,
+              colorText: Colors.white,
+            );
+          },
+        );
+      }
+    }
 
     return ValueListenableBuilder(
       valueListenable: box.listenable(),
       builder: (context, Box<NotificationHiveModel> box, _) {
         final unreadCount =
-            box.values.where((notification) => !notification.isRead).length;
+            box.values.where((n) => !(n.isRead ?? false)).length;
 
         return Stack(
           clipBehavior: Clip.none,

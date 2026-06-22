@@ -3,13 +3,13 @@ import 'package:hive/hive.dart';
 @HiveType(typeId: 10)
 class NotificationHiveModel extends HiveObject {
   @HiveField(0)
-  int id;
+  int? id;
 
   @HiveField(1)
-  String title;
+  String? title;
 
   @HiveField(2)
-  String message;
+  String? message;
 
   @HiveField(3)
   String? type;
@@ -30,7 +30,7 @@ class NotificationHiveModel extends HiveObject {
   DateTime? expiresAt;
 
   @HiveField(9)
-  bool isRead;
+  bool? isRead;
 
   @HiveField(10)
   DateTime? readAt;
@@ -39,7 +39,7 @@ class NotificationHiveModel extends HiveObject {
   DateTime? receivedAt;
 
   @HiveField(12)
-  bool isScheduled;
+  bool? isScheduled;
 
   @HiveField(13)
   DateTime? lastSyncedAt;
@@ -54,10 +54,10 @@ class NotificationHiveModel extends HiveObject {
     this.sendAt,
     this.sentAt,
     this.expiresAt,
-    required this.isRead,
+    this.isRead = false,
     this.readAt,
     this.receivedAt,
-    required this.isScheduled,
+    this.isScheduled = false,
     this.lastSyncedAt,
   });
 

@@ -13,19 +13,19 @@ class NotificationHiveModelAdapter extends TypeAdapter<NotificationHiveModel> {
     };
 
     return NotificationHiveModel(
-      id: fields[0] as int,
-      title: fields[1] as String,
-      message: fields[2] as String,
+      id: fields[0] as int?,
+      title: fields[1] as String?,
+      message: fields[2] as String?,
       type: fields[3] as String?,
       imageUrl: fields[4] as String?,
       link: fields[5] as String?,
       sendAt: fields[6] as DateTime?,
       sentAt: fields[7] as DateTime?,
       expiresAt: fields[8] as DateTime?,
-      isRead: fields[9] as bool,
+      isRead: fields[9] as bool?,
       readAt: fields[10] as DateTime?,
       receivedAt: fields[11] as DateTime?,
-      isScheduled: fields[12] as bool,
+      isScheduled: fields[12] as bool?,
       lastSyncedAt: fields[13] as DateTime?,
     );
   }

@@ -1,3 +1,5 @@
+// lib/features/home/presentation/bloc/home_bloc.dart
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/domain/entities/post.dart';
 import '../../domain/usecases/get_posts_usecase.dart';
@@ -37,13 +39,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     ));
 
     result.fold(
-      (failure) => emit(HomeError(message: failure.message)),
+      (failure) {
+        // ✅ عند الخطأ يجب أن يعرض رسالة واضحة
+        // الـ Repository سيرجع Cache تلقائياً إذا وُجد،
+        // إذا وصلنا هنا فمعناه لا Cache ولا إنترنت
+        emit(HomeError(message: failure.message));
+      },
       (posts) {
         _posts = posts;
 
         if (_posts.isEmpty) {
           emit(HomeEmpty());
         } else {
+          // ✅ إذا جاءت البيانات من الـ Cache، تعامل معها كـ hasReachedMax
+          // لأن الـ Cache يحتوي فقط على الصفحة الأولى
           _hasReachedMax = posts.length < _limit;
 
           emit(HomeLoaded(
@@ -52,7 +61,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             currentPage: _currentPage,
           ));
 
-          // ✅ Prefetch next page
+          // ✅ Prefetch فقط إذا لم نصل للنهاية (= لسنا في وضع Offline)
           if (!_hasReachedMax && !_isPrefetching) {
             add(const PrefetchPostsEvent());
           }
@@ -61,7 +70,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
-  // ✅ دالة Prefetch
   Future<void> _onPrefetchPosts(
     PrefetchPostsEvent event,
     Emitter<HomeState> emit,
@@ -72,7 +80,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _isPrefetching = true;
 
     final nextPage = _currentPage + 1;
-    print('📦 Prefetching page $nextPage...');
 
     final result = await getPostsUseCase(GetPostsParams(
       page: nextPage,
@@ -80,9 +87,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     ));
 
     result.fold(
-      (failure) => null,
+      (failure) => null, // خطأ في الـ Prefetch = تجاهل بصمت
       (newPosts) {
-        print('✅ Prefetched ${newPosts.length} posts for page $nextPage');
+        // Prefetch نجح، البيانات محفوظة في Cache الـ Repository
       },
     );
 
@@ -111,18 +118,33 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     result.fold(
       (failure) {
+        // ✅ فشل تحميل المزيد: ارجع للحالة السابقة مع رسالة خطأ مؤقتة
         emit(HomeError(
           message: failure.message,
           existingPosts: currentPosts,
         ));
         Future.delayed(const Duration(seconds: 2), () {
           if (!isClosed && state is HomeError) {
-            emit(
-                HomeLoaded(posts: currentPosts, hasReachedMax: _hasReachedMax));
+            emit(HomeLoaded(
+              posts: currentPosts,
+              hasReachedMax: _hasReachedMax,
+              currentPage: _currentPage,
+            ));
           }
         });
       },
       (newPosts) {
+        // ✅ إذا رجعت قائمة فارغة من الـ Repository (وضع Offline للصفحات التالية)
+        if (newPosts.isEmpty) {
+          _hasReachedMax = true;
+          emit(HomeLoaded(
+            posts: currentPosts,
+            hasReachedMax: true,
+            currentPage: _currentPage,
+          ));
+          return;
+        }
+
         _currentPage = nextPage;
         _posts = [...currentPosts, ...newPosts];
         _hasReachedMax = newPosts.length < _limit;
@@ -133,7 +155,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           currentPage: _currentPage,
         ));
 
-        // ✅ Prefetch next page
         if (!_hasReachedMax && !_isPrefetching) {
           add(const PrefetchPostsEvent());
         }
@@ -146,6 +167,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) async {
     _isPrefetching = false;
+    _hasReachedMax = false;
+    _currentPage = 1;
+    _posts = [];
     add(const FetchPostsEvent(page: 1, limit: _limit));
   }
 }
