@@ -101,29 +101,46 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Core services registered');
 
   // ============================================================================
-  // ✅ 3. تهيئة HiveService - THIS IS THE ONLY PLACE WHERE Hive.initFlutter() IS CALLED
+  // ✅ 3. تهيئة HiveService
   // ============================================================================
   try {
     await getIt<HiveService>().init();
     debugPrint('✅ HiveService initialized successfully');
   } catch (e) {
     debugPrint('❌ Error initializing HiveService: $e');
-    // ✅ محاولة فتح الصناديق بشكل يدوي في حالة الفشل
     debugPrint('🔄 Attempting to open boxes manually...');
     await _openBoxesManually();
   }
 
-  // ✅ الحصول على مراجع الصناديق - فقط نستخدم Hive.box() لأن HiveService فتحها بالفعل
+  // ============================================================================
+  // ✅ 3.5. التأكد من فتح جميع الصناديق المطلوبة
+  // ============================================================================
+  await _ensureAllBoxesOpen();
+
+  // ============================================================================
+  // ✅ 4. الحصول على مراجع الصناديق
+  // ============================================================================
+
   Box userBox;
+  Box postsBox;
   Box<NotificationHiveModel> notificationBox;
 
   try {
-    userBox = Hive.box('user_box');
+    userBox = Hive.box(StorageKeys.userBox);
     debugPrint('✅ user_box retrieved');
   } catch (e) {
     debugPrint('⚠️ user_box not open, opening now...');
-    userBox = await Hive.openBox('user_box');
+    userBox = await Hive.openBox(StorageKeys.userBox);
     debugPrint('✅ user_box opened');
+  }
+
+  try {
+    postsBox = Hive.box(StorageKeys.postsBox);
+    debugPrint('✅ posts_box retrieved');
+  } catch (e) {
+    debugPrint('⚠️ posts_box not open, opening now...');
+    postsBox = await Hive.openBox(StorageKeys.postsBox);
+    debugPrint('✅ posts_box opened');
   }
 
   try {
@@ -138,7 +155,7 @@ Future<void> setupServiceLocator() async {
   }
 
   // ============================================================================
-  // ✅ 4. Auth Data Layer
+  // ✅ 5. Auth Data Layer
   // ============================================================================
 
   getIt.registerLazySingleton<AuthRemoteDataSource>(
@@ -158,7 +175,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Auth layer registered');
 
   // ============================================================================
-  // ✅ 5. Auth Domain Layer
+  // ✅ 6. Auth Domain Layer
   // ============================================================================
 
   getIt.registerLazySingleton<LoginUseCase>(
@@ -180,7 +197,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Auth usecases registered');
 
   // ============================================================================
-  // ✅ 6. Auth Presentation Layer
+  // ✅ 7. Auth Presentation Layer
   // ============================================================================
 
   getIt.registerFactory<AuthBloc>(
@@ -195,15 +212,16 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ AuthBloc registered');
 
   // ============================================================================
-  // ✅ 7. Home Feature
+  // ✅ 8. Home Feature - ✅ تم التصحيح هنا
   // ============================================================================
 
   getIt.registerLazySingleton<HomeRemoteDataSource>(
     () => HomeRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
+  // ✅ تمرير الصندوق المفتوح إلى HomeLocalDataSource
   getIt.registerLazySingleton<HomeLocalDataSource>(
-    () => HomeLocalDataSource(),
+    () => HomeLocalDataSource(postsBox: postsBox),
   );
 
   getIt.registerLazySingleton<HomeRepository>(
@@ -215,12 +233,13 @@ Future<void> setupServiceLocator() async {
 
   getIt.registerLazySingleton<GetPostsUseCase>(
       () => GetPostsUseCase(getIt<HomeRepository>()));
+
   getIt.registerFactory<HomeBloc>(
       () => HomeBloc(getPostsUseCase: getIt<GetPostsUseCase>()));
   debugPrint('✅ Home feature registered');
 
   // ============================================================================
-  // ✅ 8. Post Details Feature
+  // ✅ 9. Post Details Feature
   // ============================================================================
 
   getIt.registerLazySingleton<PostRemoteDataSource>(
@@ -229,7 +248,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Post details feature registered');
 
   // ============================================================================
-  // ✅ 9. Daily Commitment Feature
+  // ✅ 10. Daily Commitment Feature
   // ============================================================================
 
   // Initialize Local Data Source
@@ -296,7 +315,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Daily Commitment feature registered');
 
   // ============================================================================
-  // ✅ 10. Ads Feature
+  // ✅ 11. Ads Feature
   // ============================================================================
 
   getIt.registerLazySingleton<AdsRemoteDataSource>(
@@ -324,7 +343,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Ads feature registered');
 
   // ============================================================================
-  // ✅ 11. Weight Tracking Feature
+  // ✅ 12. Weight Tracking Feature
   // ============================================================================
 
   getIt.registerLazySingleton<WeightLocalDataSource>(
@@ -374,7 +393,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Weight Tracking feature registered');
 
   // ============================================================================
-  // ✅ 12. Notifications Feature
+  // ✅ 13. Notifications Feature
   // ============================================================================
 
   getIt.registerLazySingleton<NotificationApiService>(
@@ -415,7 +434,7 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Notifications feature registered');
 
   // ============================================================================
-  // ✅ 13. Drawer Feature
+  // ✅ 14. Drawer Feature
   // ============================================================================
 
   getIt.registerLazySingleton<SubscriptionRemoteDataSource>(
@@ -441,6 +460,33 @@ Future<void> setupServiceLocator() async {
 // ============================================================================
 // ✅ Helper Functions
 // ============================================================================
+
+/// ✅ دالة للتأكد من فتح جميع الصناديق المطلوبة
+Future<void> _ensureAllBoxesOpen() async {
+  debugPrint('🔄 Ensuring all boxes are open...');
+
+  final boxNames = [
+    StorageKeys.userBox,
+    StorageKeys.postsBox,
+    StorageKeys.notificationsBox,
+    StorageKeys.weightsBox,
+    StorageKeys.dailyCommitmentBox,
+    StorageKeys.syncQueueBox,
+  ];
+
+  for (final name in boxNames) {
+    try {
+      if (!Hive.isBoxOpen(name)) {
+        await Hive.openBox(name);
+        debugPrint('✅ Opened box: $name');
+      } else {
+        debugPrint('✅ Box already open: $name');
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to open box $name: $e');
+    }
+  }
+}
 
 Future<void> _openBoxesManually() async {
   debugPrint('🔄 Opening boxes manually...');

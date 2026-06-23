@@ -26,6 +26,7 @@ import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/login
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/profile_setup_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subscription_expired_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_bloc.dart';
+import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/ideal_weight_splash_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/navigation_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/NotificationHiveModelAdapter.dart';
@@ -81,7 +82,6 @@ void main() async {
 
     await registerNotificationSync();
 
-    // ✅ تخزين الـ plugin
     getIt
         .registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
 
@@ -157,21 +157,33 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        // ✅ Auth Bloc
         BlocProvider<AuthBloc>(
           create: (context) {
             final authBloc = getIt<AuthBloc>();
-            authBloc.add(CheckSessionEvent());
+
             return authBloc;
           },
         ),
+
+        // ✅ Home Bloc - جلب البيانات فوراً عند إنشاء الصفحة
         BlocProvider<HomeBloc>(
-          create: (context) => getIt<HomeBloc>(),
+          create: (context) {
+            final homeBloc = getIt<HomeBloc>();
+            // ✅ إضافة حدث جلب البيانات هنا فقط (مرة واحدة)
+            homeBloc.add(const FetchPostsEvent(page: 1, limit: 10));
+            return homeBloc;
+          },
         ),
+
+        // ✅ Notifications Bloc
         BlocProvider<NotificationBloc>(
           create: (context) => getIt<NotificationBloc>()
             ..add(LoadNotifications())
             ..add(SyncNotifications()),
         ),
+
+        // ✅ Weight Bloc
         BlocProvider<WeightBloc>(
           create: (context) => getIt<WeightBloc>()..add(LoadWeightsEvent()),
         ),
@@ -263,12 +275,14 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkCachedSession() async {
-    if (!mounted) return;
-
     try {
-      final authRepository = getIt.get<AuthRepository>();
+      final authRepository = getIt<AuthRepository>();
+
       final token = await authRepository.getStoredToken();
       final user = await authRepository.getStoredUser();
+
+      debugPrint('Token: $token');
+      debugPrint('User: ${user?.email}');
 
       if (token != null && token.isNotEmpty && user != null) {
         await _navigateBasedOnProfile(user);
@@ -276,7 +290,7 @@ class _SplashScreenState extends State<SplashScreen> {
         _navigateToLogin();
       }
     } catch (e) {
-      debugPrint('⚠️ Error checking cached session: $e');
+      debugPrint('Cached session error: $e');
       _navigateToLogin();
     }
   }

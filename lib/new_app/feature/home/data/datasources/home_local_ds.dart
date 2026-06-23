@@ -6,27 +6,37 @@ import '../models/post_model.dart';
 
 class HomeLocalDataSource {
   final Box _postsBox;
-  
+
   HomeLocalDataSource({Box? postsBox})
       : _postsBox = postsBox ?? Hive.box(StorageKeys.postsBox);
-  
+
   /// حفظ المنشورات
   Future<void> savePosts(List<PostModel> posts) async {
     try {
-      final postsJson = posts.map((p) => p.toJson()).toList();
+      // ✅ Validate posts before saving
+      final validPosts = posts.where((p) => p.id > 0).toList();
+
+      if (validPosts.isEmpty) {
+        print('⚠️ No valid posts to cache');
+        return;
+      }
+
+      final postsJson = validPosts.map((p) => p.toJson()).toList();
       await _postsBox.put('cached_posts', postsJson);
       await _postsBox.put('last_updated', DateTime.now().toIso8601String());
+      print('✅ Cached ${validPosts.length} posts');
     } catch (e) {
-      print('Error saving posts: $e');
+      print('❌ Error saving posts: $e');
+      // Don't rethrow - caching failure shouldn't break the app
     }
   }
-  
+
   /// جلب المنشورات المخزنة
   List<PostModel> getCachedPosts() {
     try {
       final cached = _postsBox.get('cached_posts');
       if (cached == null) return [];
-      
+
       if (cached is List) {
         final List<PostModel> posts = [];
         for (var item in cached) {
@@ -51,17 +61,17 @@ class HomeLocalDataSource {
       return [];
     }
   }
-  
+
   /// حفظ منشور فردي
   Future<void> savePost(PostModel post) async {
     await _postsBox.put('post_${post.id}', post.toJson());
   }
-  
+
   /// جلب منشور فردي
   PostModel? getCachedPost(int id) {
     final cached = _postsBox.get('post_$id');
     if (cached == null) return null;
-    
+
     if (cached is Map) {
       final Map<String, dynamic> json = {};
       cached.forEach((key, value) {
@@ -71,11 +81,11 @@ class HomeLocalDataSource {
     }
     return null;
   }
-  
+
   bool hasCachedPosts() {
     return _postsBox.containsKey('cached_posts');
   }
-  
+
   DateTime? getLastUpdateTime() {
     final lastUpdated = _postsBox.get('last_updated');
     if (lastUpdated != null && lastUpdated is String) {
@@ -83,7 +93,7 @@ class HomeLocalDataSource {
     }
     return null;
   }
-  
+
   Future<void> clearCache() async {
     await _postsBox.delete('cached_posts');
     await _postsBox.delete('last_updated');

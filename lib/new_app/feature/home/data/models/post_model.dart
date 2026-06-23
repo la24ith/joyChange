@@ -8,10 +8,10 @@ class AuthorModel extends Author {
     required super.name,
   });
 
-  factory AuthorModel.fromJson(Map<String, dynamic> json) {
+  factory AuthorModel.fromJson(Map<dynamic, dynamic> json) {
     return AuthorModel(
-      id: json['id'] as int,
-      name: json['name'] as String,
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? 'غير معروف',
     );
   }
 
@@ -44,23 +44,30 @@ class PostModel extends Post {
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
+    // ✅ التعامل مع null بأمان لجميع الحقول
     return PostModel(
-      id: json['id'] as int,
-      title: json['title'] as String,
-      slug: json['slug'] as String,
-      content: json['content'] as String,
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? 'بدون عنوان',
+      slug: json['slug'] as String? ?? '',
+      content: json['content'] as String? ?? '',
       excerpt: json['excerpt'] as String?,
       thumbnail: json['thumbnail'] as String?,
       thumbnailUrl: json['thumbnail_url'] as String?,
-      status: json['status'] as String,
-      publishedAt: DateTime.parse(json['published_at'] as String),
-      viewCount: json['view_count'] as int,
-      isFeatured: json['is_featured'] as bool,
-      allowDownload: json['allow_download'] as bool,
-      author: AuthorModel.fromJson(json['author'] as Map<String, dynamic>),
+      status: json['status'] as String? ?? 'draft',
+      publishedAt: json['published_at'] != null
+          ? DateTime.parse(json['published_at'] as String)
+          : DateTime.now(),
+      viewCount: json['view_count'] as int? ?? 0,
+      isFeatured: json['is_featured'] as bool? ?? false,
+      allowDownload: json['allow_download'] as bool? ?? false,
+      author: json['author'] != null
+          ? AuthorModel.fromJson(json['author'] as Map<String, dynamic>)
+          : const AuthorModel(id: 0, name: 'غير معروف'),
       category: json['category'],
       patientSegment: json['patient_segment'],
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
     );
   }
 
@@ -146,10 +153,10 @@ class PostsPagination {
 
   factory PostsPagination.fromJson(Map<String, dynamic> json) {
     return PostsPagination(
-      currentPage: json['current_page'] as int,
-      lastPage: json['last_page'] as int,
-      perPage: json['per_page'] as int,
-      total: json['total'] as int,
+      currentPage: json['current_page'] as int? ?? 1,
+      lastPage: json['last_page'] as int? ?? 1,
+      perPage: json['per_page'] as int? ?? 10,
+      total: json['total'] as int? ?? 0,
     );
   }
 

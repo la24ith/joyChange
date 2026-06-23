@@ -43,7 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _homeBloc = getIt<HomeBloc>()..add(FetchPostsEvent(page: 1, limit: 10));
+
+    // ✅ فقط احصل على الـ Bloc، لا تضيف حدث هنا
+    _homeBloc = context.read<HomeBloc>();
+
+    // ✅ لا تضيف FetchPostsEvent هنا لأنه سيضاف في main.dart
+
     _adsBloc = getIt<AdsBloc>()..add(LoadActiveAdsEvent());
     _scrollController.addListener(_onScroll);
     _checkConnectivity();

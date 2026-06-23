@@ -26,9 +26,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     FetchPostsEvent event,
     Emitter<HomeState> emit,
   ) async {
+    print(
+        '🔍 HomeBloc._onFetchPosts: page=${event.page}, limit=${event.limit}');
+
     if (state is HomeLoading) return;
 
     emit(HomeLoading());
+    print('⏳ Emitted HomeLoading');
 
     _currentPage = 1;
     _hasReachedMax = false;
@@ -40,19 +44,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     result.fold(
       (failure) {
-        // ✅ عند الخطأ يجب أن يعرض رسالة واضحة
-        // الـ Repository سيرجع Cache تلقائياً إذا وُجد،
-        // إذا وصلنا هنا فمعناه لا Cache ولا إنترنت
+        print('❌ Fetch posts failed: ${failure.message}');
         emit(HomeError(message: failure.message));
+        print('❌ Emitted HomeError');
       },
       (posts) {
+        print('✅ Fetch posts success: ${posts.length} posts');
         _posts = posts;
 
         if (_posts.isEmpty) {
+          print('⚠️ Posts list is empty');
           emit(HomeEmpty());
+          print('⚠️ Emitted HomeEmpty');
         } else {
-          // ✅ إذا جاءت البيانات من الـ Cache، تعامل معها كـ hasReachedMax
-          // لأن الـ Cache يحتوي فقط على الصفحة الأولى
+          print('📝 First post: ${_posts.first.title}');
           _hasReachedMax = posts.length < _limit;
 
           emit(HomeLoaded(
@@ -60,8 +65,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             hasReachedMax: _hasReachedMax,
             currentPage: _currentPage,
           ));
+          print('✅ Emitted HomeLoaded with ${_posts.length} posts');
 
-          // ✅ Prefetch فقط إذا لم نصل للنهاية (= لسنا في وضع Offline)
           if (!_hasReachedMax && !_isPrefetching) {
             add(const PrefetchPostsEvent());
           }

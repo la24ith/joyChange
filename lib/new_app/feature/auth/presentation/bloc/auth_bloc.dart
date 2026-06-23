@@ -71,27 +71,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     final result = await _checkSessionUseCase();
 
-    result.fold(
-      (failure) {
+    await result.fold(
+      (failure) async {
         if (failure is SessionExpiredFailure) {
           emit(const Unauthenticated());
         } else if (failure is SubscriptionExpiredFailure) {
           emit(SubscriptionInactive(message: failure.message));
         } else {
-          _emitCachedState(emit);
+          await _emitCachedState(emit);
         }
       },
-      (sessionResult) {
+      (sessionResult) async {
         if (!sessionResult.isProfileComplete) {
           emit(ProfileIncomplete(
             user: sessionResult.user,
             message: 'يرجى إكمال ملفك الشخصي',
           ));
         } else {
-          emit(Authenticated(
-            user: sessionResult.user,
-            token: '',
-          ));
+          emit(
+            Authenticated(
+              user: sessionResult.user,
+              token: '',
+            ),
+          );
         }
       },
     );
