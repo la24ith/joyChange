@@ -10,24 +10,30 @@ class HomeLocalDataSource {
   HomeLocalDataSource({Box? postsBox})
       : _postsBox = postsBox ?? Hive.box(StorageKeys.postsBox);
 
+  /// ✅ تحويل عميق لأي Map إلى Map<String, dynamic> بما فيها الـ nested maps
+  Map<String, dynamic> _deepConvert(dynamic map) {
+    final result = <String, dynamic>{};
+    (map as Map).forEach((key, value) {
+      if (value is Map) {
+        result[key.toString()] = _deepConvert(value);
+      } else if (value is List) {
+        result[key.toString()] =
+            value.map((e) => e is Map ? _deepConvert(e) : e).toList();
+      } else {
+        result[key.toString()] = value;
+      }
+    });
+    return result;
+  }
+
   /// حفظ المنشورات
   Future<void> savePosts(List<PostModel> posts) async {
     try {
-      // ✅ Validate posts before saving
-      final validPosts = posts.where((p) => p.id > 0).toList();
-
-      if (validPosts.isEmpty) {
-        print('⚠️ No valid posts to cache');
-        return;
-      }
-
-      final postsJson = validPosts.map((p) => p.toJson()).toList();
+      final postsJson = posts.map((p) => p.toJson()).toList();
       await _postsBox.put('cached_posts', postsJson);
       await _postsBox.put('last_updated', DateTime.now().toIso8601String());
-      print('✅ Cached ${validPosts.length} posts');
     } catch (e) {
-      print('❌ Error saving posts: $e');
-      // Don't rethrow - caching failure shouldn't break the app
+      print('Error saving posts: $e');
     }
   }
 
@@ -42,11 +48,8 @@ class HomeLocalDataSource {
         for (var item in cached) {
           try {
             if (item is Map) {
-              // تحويل Map إلى Map<String, dynamic>
-              final Map<String, dynamic> json = {};
-              item.forEach((key, value) {
-                json[key.toString()] = value;
-              });
+              // ✅ تحويل عميق يشمل author وكل الـ nested maps
+              final Map<String, dynamic> json = _deepConvert(item);
               posts.add(PostModel.fromJson(json));
             }
           } catch (e) {
@@ -73,11 +76,7 @@ class HomeLocalDataSource {
     if (cached == null) return null;
 
     if (cached is Map) {
-      final Map<String, dynamic> json = {};
-      cached.forEach((key, value) {
-        json[key.toString()] = value;
-      });
-      return PostModel.fromJson(json);
+      return PostModel.fromJson(_deepConvert(cached));
     }
     return null;
   }
