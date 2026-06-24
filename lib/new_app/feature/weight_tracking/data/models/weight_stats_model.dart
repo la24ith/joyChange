@@ -19,11 +19,19 @@ class WeightStatsModel extends Equatable {
   factory WeightStatsModel.fromJson(Map<String, dynamic> json) {
     final data = json['data'] ?? json;
 
+    // ✅ إصلاح: الـ API يرجع first_weight و latest_weight كـ String ("66.00")
+    double? parseDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
     return WeightStatsModel(
       entries: (data['entries'] as num?)?.toInt() ?? 0,
-      firstWeight: (data['first_weight'] as num?)?.toDouble(),
-      latestWeight: (data['latest_weight'] as num?)?.toDouble(),
-      change: (data['change'] as num?)?.toDouble(),
+      firstWeight: parseDouble(data['first_weight']),
+      latestWeight: parseDouble(data['latest_weight']),
+      change: parseDouble(data['change']),
     );
   }
 
@@ -90,10 +98,5 @@ class WeightStatsModel extends Equatable {
   }
 
   @override
-  List<Object?> get props => [
-        entries,
-        firstWeight,
-        latestWeight,
-        change,
-      ];
+  List<Object?> get props => [entries, firstWeight, latestWeight, change];
 }

@@ -24,11 +24,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     LoadNotifications event,
     Emitter<NotificationState> emit,
   ) async {
-    // ✅ أولاً: اعرض البيانات المحلية فوراً
     final localData = await repository.getNotifications();
     emit(NotificationLoaded(localData));
 
-    // ✅ ثانياً: اشترك في التغييرات
     await _notificationsSubscription?.cancel();
     _notificationsSubscription = repository.watchNotifications().listen(
       (notifications) {
@@ -36,7 +34,6 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       },
     );
 
-    // ✅ ثالثاً: sync في الخلفية
     repository.syncNotifications().catchError((_) {});
   }
 
@@ -68,10 +65,13 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
     _isLoading = true;
     try {
-      emit(MarkAllReadloading());
+      // ✅ إصلاح: استخدام الأسماء المصححة
+      emit(MarkAllReadLoading());
       await repository.markAllRead();
       if (!isClosed) {
-        emit(MarkAllReadSuccesfuly());
+        emit(MarkAllReadSuccessfully());
+        // ✅ إصلاح: إعادة تحميل البيانات بعد النجاح لتحديث الـ UI
+        add(LoadNotifications());
       }
     } catch (e) {
       if (!isClosed) {

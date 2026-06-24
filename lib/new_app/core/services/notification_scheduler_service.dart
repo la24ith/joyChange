@@ -10,7 +10,8 @@ class NotificationSchedulerService {
   NotificationSchedulerService(this.plugin);
 
   Future<void> scheduleNotification(NotificationHiveModel notification) async {
-    if (notification.isScheduled!) {
+    // ✅ إصلاح: استخدام == true بدل ! لتجنب null crash
+    if (notification.isScheduled == true) {
       debugPrint('⏭️ Notification ${notification.id} already scheduled');
       return;
     }
@@ -33,7 +34,6 @@ class NotificationSchedulerService {
 
       final now = DateTime.now();
 
-      // ✅ التحقق من أن التاريخ في المستقبل وليس بعيد جداً
       final maxFuture = now.add(const Duration(days: 365));
       if (scheduleDate.isAfter(maxFuture)) {
         debugPrint('⚠️ Notification ${notification.id} is too far in future');

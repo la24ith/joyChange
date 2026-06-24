@@ -26,6 +26,8 @@ class DailyCommitmentBloc
   final SavePendingAnswerUseCase _savePendingAnswerUseCase;
   final SyncPendingAnswersUseCase _syncPendingAnswersUseCase;
 
+  bool _isSyncing = false;
+
   DailyCommitmentBloc({
     required GetStatsUseCase getStatsUseCase,
     required GetAnswerHistoryUseCase getAnswerHistoryUseCase,
@@ -56,7 +58,6 @@ class DailyCommitmentBloc
     Emitter<DailyCommitmentState> emit,
   ) async {
     try {
-      // ⚡ Step 1: Load local data immediately (0ms)
       final localData = await _getLocalDataUseCase();
 
       emit(DailyCommitmentLoaded(
@@ -75,11 +76,9 @@ class DailyCommitmentBloc
         isSynced: localData.isSynced,
       ));
 
-      // 🔄 Step 2: Sync in background
       _syncDataInBackground();
     } catch (e) {
-      emit(DailyCommitmentError(
-          message: 'Failed to load data: ${e.toString()}'));
+      emit(DailyCommitmentError(message: 'Failed to load data: ${e.toString()}'));
     }
   }
 
@@ -98,19 +97,12 @@ class DailyCommitmentBloc
         return;
       }
 
-      // ⚡ Step 1: Update locally immediately
+      // ⚡ Step 1: Optimistic local update
       final localData = await _getLocalDataUseCase();
       final updatedData = localData.updateWithAnswer(event.answer);
       await _saveLocalDataUseCase(updatedData);
 
-      // 📝 Save for later sync
-      await _savePendingAnswerUseCase(
-        answer: event.answer,
-        date: event.date,
-        notes: event.notes,
-      );
-
-      // ✅ Show immediate success
+      // ✅ Immediate UI feedback — before any network call
       emit(DailyCommitmentLoaded(
         question: updatedData.question,
         stats: DailyStats(
@@ -133,35 +125,58 @@ class DailyCommitmentBloc
             : '💪 تم تسجيل إجابتك، غداً يوم جديد',
       ));
 
-      // 🔄 Step 2: Submit to server in background
-      _submitToServerAndSync(event);
+      // 🌐 Step 2: Try server directly — only save to pending queue if it fails
+      _submitToServerOrQueue(event);
     } catch (e) {
-      emit(DailyCommitmentError(
-          message: 'Failed to submit answer: ${e.toString()}'));
+      emit(DailyCommitmentError(message: 'Failed to submit answer: ${e.toString()}'));
     }
   }
 
   // ============================================================================
-  // 🔄 Refresh
+  // 🔄 Refresh (reads local only — no sync)
   // ============================================================================
 
   Future<void> _onRefresh(
     RefreshDailyCommitmentEvent event,
     Emitter<DailyCommitmentState> emit,
   ) async {
-    add(LoadDailyCommitmentEvent());
+    try {
+      final localData = await _getLocalDataUseCase();
+      emit(DailyCommitmentLoaded(
+        question: localData.question,
+        stats: DailyStats(
+          total: localData.totalDays,
+          yes: localData.yesCount,
+          no: localData.noCount,
+          skipped: localData.skippedCount,
+          adherenceRate: localData.adherenceRate,
+        ),
+        history: const [],
+        answeredToday: localData.answeredToday,
+        todayAnswer: localData.todayAnswer,
+        isFromCache: false,
+        isSynced: localData.isSynced,
+      ));
+    } catch (e) {
+      emit(DailyCommitmentError(message: 'Failed to refresh: ${e.toString()}'));
+    }
   }
 
   // ============================================================================
   // 🔧 Private Methods
   // ============================================================================
 
+  /// Background sync: runs once at a time.
+  /// Syncs any pending answers first, then pulls fresh server data.
   Future<void> _syncDataInBackground() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+
     try {
-      // 1. Sync pending answers
+      // Sync any answers that were queued while offline
       await _syncPendingAnswersUseCase();
 
-      // 2. Fetch fresh data from server
+      // Pull fresh stats + history from server
       final statsResult = await _getStatsUseCase();
       final historyResult = await _getAnswerHistoryUseCase();
 
@@ -169,26 +184,22 @@ class DailyCommitmentBloc
         final stats = statsResult.getOrElse(() => throw Exception());
         final history = historyResult.getOrElse(() => []);
 
-        // Check if answered today
         final today = DateTime.now();
-        final answeredToday = history.any((item) {
-          return item.date.year == today.year &&
-              item.date.month == today.month &&
-              item.date.day == today.day;
-        });
+        final answeredToday = history.any((item) =>
+            item.date.year == today.year &&
+            item.date.month == today.month &&
+            item.date.day == today.day);
 
         final todayAnswer = answeredToday
             ? history
-                .firstWhere((item) {
-                  return item.date.year == today.year &&
-                      item.date.month == today.month &&
-                      item.date.day == today.day;
-                })
+                .firstWhere((item) =>
+                    item.date.year == today.year &&
+                    item.date.month == today.month &&
+                    item.date.day == today.day)
                 .answer
                 .value
             : null;
 
-        // Update local data
         final localData = await _getLocalDataUseCase();
         final updatedData = localData.updateFromServer(
           total: stats.total,
@@ -201,17 +212,22 @@ class DailyCommitmentBloc
         );
         await _saveLocalDataUseCase(updatedData);
 
-        // Update UI if still open
+        // One Refresh to update UI — _onRefresh does NOT trigger another sync
         if (!isClosed) {
           add(RefreshDailyCommitmentEvent());
         }
       }
     } catch (e) {
       print('⚠️ Background sync failed: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 
-  Future<void> _submitToServerAndSync(SubmitAnswerEvent event) async {
+  /// Tries to submit directly to server.
+  /// On success  → marks local data as synced (no pending queue used).
+  /// On failure  → saves to pending queue so syncPendingAnswers retries later.
+  Future<void> _submitToServerOrQueue(SubmitAnswerEvent event) async {
     try {
       final result = await _submitAnswerUseCase(SubmitAnswerParams(
         answer: event.answer,
@@ -220,23 +236,30 @@ class DailyCommitmentBloc
       ));
 
       result.fold(
-        (failure) {
-          print('❌ Server submission failed: ${failure.message}');
-          // Will retry via sync pending answers
+        (failure) async {
+          // Network / server error → queue for later retry
+          print('❌ Server submission failed: ${failure.message} — queuing for retry');
+          await _savePendingAnswerUseCase(
+            answer: event.answer,
+            date: event.date,
+            notes: event.notes,
+          );
         },
         (answer) async {
+          // Success → mark synced, no need to queue anything
           print('✅ Server submission successful');
-          // Mark as synced
           final localData = await _getLocalDataUseCase();
           await _saveLocalDataUseCase(localData.markAsSynced());
-
-          if (!isClosed) {
-            add(RefreshDailyCommitmentEvent());
-          }
         },
       );
     } catch (e) {
-      print('❌ Background submission error: $e');
+      // Unexpected error → queue for later retry
+      print('❌ Background submission error: $e — queuing for retry');
+      await _savePendingAnswerUseCase(
+        answer: event.answer,
+        date: event.date,
+        notes: event.notes,
+      );
     }
   }
 }

@@ -14,7 +14,7 @@ class WeightRemoteDataSource {
   WeightRemoteDataSource({DioClient? dioClient})
       : _dioClient = dioClient ?? DioClient.instance;
 
-  // ==================== GET WEIGHTS WITH ETAG ====================
+  // ==================== GET WEIGHTS ====================
   Future<List<WeightEntryModel>> getWeights({String? etag}) async {
     try {
       final options = Options(
@@ -28,21 +28,14 @@ class WeightRemoteDataSource {
         options: options,
       );
 
-      // 304 Not Modified - استخدام الكاش
       if (response.statusCode == 304) {
         throw const CacheNotModifiedException();
       }
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final List<dynamic> data = response.data['data'];
-
-        // حفظ ETag من الـ Response
-        final newEtag = response.headers['etag']?.first;
-        if (newEtag != null) {
-          // سيتم حفظه في الـ Repository
-        }
-
-        return data.map((json) => WeightEntryModel.fromJson(json)).toList();
+        // ✅ إصلاح رئيسي: الـ API يرجع { "data": [...], "meta": {...} }
+        // نستخدم fromJsonList الذي يتعامل مع pagination تلقائياً
+        return WeightEntryModel.fromJsonList(response.data);
       } else {
         throw ServerException(
           message: response.data['message'] ?? 'Failed to load weights',
@@ -125,8 +118,7 @@ class WeightRemoteDataSource {
   }
 
   // ==================== ADD WEIGHT ENTRY ====================
-  Future<void> addWeightEntry(double weight, DateTime date,
-      {String? notes}) async {
+  Future<void> addWeightEntry(double weight, DateTime date, {String? notes}) async {
     try {
       final response = await _dioClient.post(
         ApiEndpoints.addWeight,
@@ -163,7 +155,7 @@ class WeightRemoteDataSource {
       ]);
 
       return {
-        'weights': results[0].data['data'] as List,
+        'weights': results[0].data,  // نمرر الـ response كاملاً
         'stats': results[1].data,
         'chart': results[2].data,
         'status': results[3].data,

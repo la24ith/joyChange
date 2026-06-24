@@ -30,14 +30,9 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
       final question = await remoteDataSource.getTodayQuestion();
       return Right(question);
     } on ServerException catch (e) {
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
-      return Left(UnknownFailure(
-        message: 'Failed to load question: ${e.toString()}',
-      ));
+      return Left(UnknownFailure(message: 'Failed to load question: ${e.toString()}'));
     }
   }
 
@@ -55,14 +50,9 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
       );
       return Right(result);
     } on ServerException catch (e) {
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
-      return Left(UnknownFailure(
-        message: 'Failed to submit answer: ${e.toString()}',
-      ));
+      return Left(UnknownFailure(message: 'Failed to submit answer: ${e.toString()}'));
     }
   }
 
@@ -72,14 +62,9 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
       final history = await remoteDataSource.getAnswerHistory();
       return Right(history);
     } on ServerException catch (e) {
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
-      return Left(UnknownFailure(
-        message: 'Failed to load history: ${e.toString()}',
-      ));
+      return Left(UnknownFailure(message: 'Failed to load history: ${e.toString()}'));
     }
   }
 
@@ -89,14 +74,9 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
       final stats = await remoteDataSource.getStats();
       return Right(stats);
     } on ServerException catch (e) {
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
-      return Left(UnknownFailure(
-        message: 'Failed to load stats: ${e.toString()}',
-      ));
+      return Left(UnknownFailure(message: 'Failed to load stats: ${e.toString()}'));
     }
   }
 
@@ -120,11 +100,7 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
     required DateTime date,
     String? notes,
   }) async {
-    await localDataSource.savePendingAnswer(
-      answer: answer,
-      date: date,
-      notes: notes,
-    );
+    await localDataSource.savePendingAnswer(answer: answer, date: date, notes: notes);
   }
 
   @override
@@ -149,7 +125,9 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
 
     print('🔄 Syncing ${pending.length} pending answers...');
 
-    for (var i = 0; i < pending.length; i++) {
+    // FIX: iterate in reverse so removing by index stays correct,
+    // and treat "already answered" as a success (remove from queue).
+    for (var i = pending.length - 1; i >= 0; i--) {
       final answerData = pending[i];
       try {
         await remoteDataSource.submitAnswer(
@@ -159,20 +137,49 @@ class DailyCommitmentRepositoryImpl implements DailyCommitmentRepository {
         );
         await localDataSource.removePendingAnswer(i);
         print('✅ Pending answer synced successfully');
+      } on ServerException catch (e) {
+        // "Already answered" means the data is on the server → remove from queue
+        if (_isAlreadyAnsweredError(e.message)) {
+          print('⚠️ Already answered on server — removing stale pending entry');
+          await localDataSource.removePendingAnswer(i);
+        } else {
+          print('❌ Failed to sync pending answer: ${e.message}');
+          // Non-recoverable for now; stop and retry later
+          break;
+        }
       } catch (e) {
-        print('❌ Failed to sync pending answer: $e');
-        // Stop syncing if one fails, will retry later
-        break;
+        // Treat any "already answered" string in generic exceptions the same way
+        final msg = e.toString();
+        if (_isAlreadyAnsweredError(msg)) {
+          print('⚠️ Already answered on server — removing stale pending entry');
+          await localDataSource.removePendingAnswer(i);
+        } else {
+          print('❌ Failed to sync pending answer: $e');
+          break;
+        }
       }
     }
 
-    // Update sync status
-    final localData = await localDataSource.getCachedData();
-    await localDataSource.saveData(localData.markAsSynced());
+    // Mark as synced only when queue is empty
+    final remaining = await localDataSource.getPendingAnswers();
+    if (remaining.isEmpty) {
+      final localData = await localDataSource.getCachedData();
+      await localDataSource.saveData(localData.markAsSynced());
+      print('✅ All pending answers synced — marked as synced');
+    }
   }
 
   @override
   Future<void> clearAllLocalData() async {
     await localDataSource.clearAll();
+  }
+
+  // ============================================================================
+  // 🔧 Helpers
+  // ============================================================================
+
+  bool _isAlreadyAnsweredError(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains('already answered') || lower.contains('already');
   }
 }

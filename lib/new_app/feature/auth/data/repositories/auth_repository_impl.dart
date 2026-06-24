@@ -1,6 +1,7 @@
 // lib/features/auth/data/repositories/auth_repository_impl.dart
 
 import 'package:dartz/dartz.dart';
+import 'package:dio/dio.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
@@ -128,20 +129,30 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, bool>> checkSubscriptionStatus(String email) async {
     try {
       final isActive = await remoteDataSource.checkSubscriptionStatus(email);
-
       return Right(isActive);
     } on SubscriptionExpiredException catch (e) {
+      // ✅ 403 من الـ DataSource
+      print('🚫 Repo: SubscriptionExpired → Left(SubscriptionExpiredFailure)');
+      return Left(SubscriptionExpiredFailure(message: e.message));
+    } on NetworkException catch (e) {
+      // ✅ timeout وضعف النت → ServerFailure (UseCase سيستخدم cached data)
+      print('⏱️ Repo: Network error → Left(ServerFailure)');
+      return Left(ServerFailure(message: e.message));
+    } on DioException catch (e) {
+      // ✅ أي DioException وصلت بعد الـ rethrow في DataSource
+      if (e.response?.statusCode == 403) {
+        print('🚫 Repo: DioException 403 → Left(SubscriptionExpiredFailure)');
+        return Left(SubscriptionExpiredFailure(
+          message: e.response?.data?['message'] ?? 'Subscription expired',
+        ));
+      }
+      print('⚠️ Repo: DioException ${e.type} → Left(ServerFailure)');
       return Left(
-        SubscriptionExpiredFailure(
-          message: e.message,
-        ),
-      );
+          ServerFailure(message: 'Failed to check subscription status'));
     } catch (e) {
+      print('⚠️ Repo: Unknown error → Left(ServerFailure): $e');
       return Left(
-        ServerFailure(
-          message: 'Failed to check subscription status',
-        ),
-      );
+          ServerFailure(message: 'Failed to check subscription status'));
     }
   }
 

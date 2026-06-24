@@ -46,9 +46,14 @@ class CheckSessionUseCase {
           (failure) {
             if (failure is SubscriptionExpiredFailure) {
               repository.clearLocalAuthData();
-              return Left(failure);
+              return Left(failure); // ✅ → صفحة انتهاء الاشتراك
             }
-            return Left(failure);
+            // ServerFailure أو NetworkFailure → cached data
+            print('⚠️ UseCase: Non-subscription failure, using cached');
+            return Right(CheckSessionResult(
+              user: user,
+              isProfileComplete: isProfileComplete,
+            ));
           },
           (isActive) {
             if (isActive) {

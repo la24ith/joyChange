@@ -163,27 +163,49 @@ class _DailyCommitmentViewState extends State<_DailyCommitmentView> {
                                     ),
                                     children: [
                                       // Question Card
-                                      QuestionCard(
-                                        isAnswered: isAnswered,
-                                        questionText: question,
-                                      ),
-
-                                      const SizedBox(height: 32),
-
-                                      // Answer Buttons
-                                      if (!isAnswered && !_isSubmitting)
-                                        AnswerButtons(
-                                          onYesPressed: () =>
-                                              _submitAnswer(context, 'yes'),
-                                          onNoPressed: () =>
-                                              _submitAnswer(context, 'no'),
+                                      if (!isAnswered) ...[
+                                        QuestionCard(
+                                          isAnswered: false,
+                                          questionText: question,
                                         ),
+                                        const SizedBox(height: 32),
+                                        if (!_isSubmitting)
+                                          AnswerButtons(
+                                            onYesPressed: () =>
+                                                _submitAnswer(context, 'yes'),
+                                            onNoPressed: () =>
+                                                _submitAnswer(context, 'no'),
+                                          ),
+                                      ],
 
-                                      // Loading Indicator
                                       if (_isSubmitting)
                                         const SubmissionLoader(),
 
-                                      // Feedback Message
+                                      if (isAnswered) ...[
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: Colors.green,
+                                          size: 80,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          'لقد أجبت على سؤال اليوم',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (state.todayAnswer != null) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'إجابتك: ${state.todayAnswer}',
+                                            style:
+                                                const TextStyle(fontSize: 16),
+                                          ),
+                                        ],
+                                      ],
+
                                       if (_feedbackMessage != null &&
                                           _selectedAnswer != null)
                                         FeedbackMessage(
@@ -196,8 +218,6 @@ class _DailyCommitmentViewState extends State<_DailyCommitmentView> {
                               ),
                             ),
                           ),
-
-                          const SizedBox(height: 20),
                         ],
                       ),
                     ),

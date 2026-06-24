@@ -36,14 +36,14 @@ class NotificationsView extends StatelessWidget {
           ),
           actions: [
             IconButton(
-              onPressed: state is MarkAllReadloading
+              onPressed: state is MarkAllReadLoading
                   ? null
                   : () {
                       context.read<NotificationBloc>().add(
                             MarkAllReadNotifications(),
                           );
                     },
-              icon: state is MarkAllReadloading
+              icon: state is MarkAllReadLoading
                   ? Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: const CircularProgressIndicator(

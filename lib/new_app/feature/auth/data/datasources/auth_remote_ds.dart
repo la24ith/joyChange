@@ -18,9 +18,13 @@ class AuthRemoteDataSource {
     try {
       final response = await _dioClient.get(
         ApiEndpoints.subscriptionStatus,
+        // ✅ إضافة timeout على مستوى الـ request
+        options: Options(
+          sendTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
       );
 
-      // الحالة الطبيعية (200)
       if (response.statusCode == 200 &&
           response.data != null &&
           response.data['success'] == true) {
@@ -30,19 +34,31 @@ class AuthRemoteDataSource {
 
       return false;
     } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
       final data = e.response?.data;
 
-      // 🔥 الحالة المهمة: اشتراك منتهي
-      if (e.response?.statusCode == 403 &&
-          data != null &&
-          data['code'] == 'SUBSCRIPTION_INACTIVE') {
-        throw SubscriptionExpiredException(
-          message: data['message'] ?? 'Subscription expired',
-        );
+      print('🔍 DS: DioException status=$statusCode type=${e.type}');
+      print('🔍 DS: Response data=$data');
+
+      // ✅ إصلاح: أي 403 = اشتراك منتهٍ، بغض النظر عن الـ code
+      if (statusCode == 403) {
+        final message =
+            data?['message'] ?? data?['error'] ?? 'Subscription expired';
+        print('🚫 DS: 403 → SubscriptionExpiredException: $message');
+        throw SubscriptionExpiredException(message: message);
       }
 
-      // أي خطأ آخر
-      throw Exception('Network or server error');
+      // ✅ إصلاح: timeout وضعف النت → استثناء مميّز
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        print('⏱️ DS: Network/timeout → NetworkException');
+        throw NetworkException(message: 'Connection timeout or weak network');
+      }
+
+      print('⚠️ DS: Other Dio error → rethrow');
+      rethrow; // ✅ ارمِ الـ DioException للـ Repository يتعامل معها
     }
   }
 

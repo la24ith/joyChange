@@ -399,7 +399,6 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<NotificationApiService>(
     () => NotificationApiService(
       getIt<DioClient>().dio,
-      dioClient: getIt<DioClient>(),
     ),
   );
 

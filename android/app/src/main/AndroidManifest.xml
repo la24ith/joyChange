@@ -9,7 +9,7 @@
     <application
         android:label="متعة التغير"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true"
         android:resource="@drawable/ic_notification"
         android:requestLegacyExternalStorage="true">

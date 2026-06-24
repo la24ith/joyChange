@@ -21,15 +21,13 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
   final GetIdealWeightStatusUseCase _getIdealWeightStatusUseCase;
   final AddWeightUseCase _addWeightUseCase;
 
-  // State Management
   Timer? _autoRefreshTimer;
   bool _isLoading = false;
   WeightLoaded? _lastLoadedState;
   DateTime? _lastRefreshTime;
 
-  // Stale-While-Revalidate Configuration
   static const int _cacheDurationMinutes = 30;
-  static const int _autoRefreshIntervalMinutes = 5;
+  static const int _autoRefreshIntervalMinutes = 60;
 
   WeightBloc({
     required GetWeightsUseCase getWeightsUseCase,
@@ -59,17 +57,13 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
     _isLoading = true;
 
     try {
-      // 1. عرض الكاش فوراً إذا كان موجوداً
+      // عرض الكاش فوراً إذا كان موجوداً
       if (_lastLoadedState != null && !event.forceRefresh) {
         emit(_lastLoadedState!);
-      } else {
-        // 2. عرض حالة التحميل فقط إذا لم يكن هناك كاش
-        if (_lastLoadedState == null) {
-          emit(WeightLoading());
-        }
+      } else if (_lastLoadedState == null) {
+        emit(WeightLoading());
       }
 
-      // 3. جلب البيانات (مع استخدام Stale-While-Revalidate)
       final results = await Future.wait([
         _getWeightsUseCase(forceRefresh: event.forceRefresh),
         _getWeightStatsUseCase(forceRefresh: event.forceRefresh),
@@ -77,15 +71,17 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
         _getIdealWeightStatusUseCase(forceRefresh: event.forceRefresh),
       ]);
 
-      // 4. معالجة النتائج
       final entriesResult = results[0] as Either<Failure, List<WeightEntry>>;
       final statsResult = results[1] as Either<Failure, WeightStats>;
       final chartResult = results[2] as Either<Failure, List<double>>;
       final statusResult = results[3] as Either<Failure, WeightGoalStatus>;
 
-      // 5. استخراج البيانات
+      // ✅ تحقق من وجود خطأ في الـ entries أولاً
+      bool hasEntriesError = false;
+      entriesResult.fold((f) => hasEntriesError = true, (_) {});
+
       final entries = entriesResult.fold(
-        (failure) => _lastLoadedState?.entries ?? [],
+        (failure) => _lastLoadedState?.entries ?? <WeightEntry>[],
         (data) => data,
       );
 
@@ -95,7 +91,7 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
       );
 
       final chartData = chartResult.fold(
-        (failure) => _lastLoadedState?.chartData ?? [],
+        (failure) => _lastLoadedState?.chartData ?? <double>[],
         (data) => data,
       );
 
@@ -107,8 +103,9 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
         (data) => data,
       );
 
-      // 6. تحديث الحالة
-      if (entries.isEmpty && _lastLoadedState == null) {
+      // ✅ إصلاح: WeightEmpty فقط إذا كان الـ API نجح وأرجع قائمة فارغة فعلاً
+      // وليس عند وجود خطأ في الشبكة
+      if (entries.isEmpty && !hasEntriesError && _lastLoadedState == null) {
         emit(WeightEmpty());
       } else {
         final newState = WeightLoaded(
@@ -124,10 +121,8 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
         emit(newState);
       }
 
-      // 7. بدء التحديث التلقائي
       _startAutoRefresh();
     } catch (e) {
-      // في حالة الخطأ، استخدم الكاش إذا كان موجوداً
       if (_lastLoadedState != null) {
         emit(_lastLoadedState!);
       } else {
@@ -159,10 +154,7 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
 
     result.fold(
       (failure) => emit(WeightError(message: failure.message)),
-      (_) {
-        // مسح الكاش وإعادة التحميل
-        add(const LoadWeightsEvent(forceRefresh: true));
-      },
+      (_) => add(const LoadWeightsEvent(forceRefresh: true)),
     );
   }
 
@@ -172,9 +164,8 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
     Emitter<WeightState> emit,
   ) async {
     try {
-      // مسح الكاش
+      _lastLoadedState = null;
       emit(WeightLoading());
-      // إعادة تحميل البيانات من API
       add(const LoadWeightsEvent(forceRefresh: true));
     } catch (e) {
       emit(WeightError(message: 'فشل مسح الكاش: ${e.toString()}'));
@@ -185,9 +176,7 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
   Future<void> _onGetCacheInfo(
     GetCacheInfoEvent event,
     Emitter<WeightState> emit,
-  ) async {
-    // يمكن إضافة حالة خاصة لعرض معلومات الكاش
-  }
+  ) async {}
 
   // ==================== AUTO REFRESH ====================
   void _startAutoRefresh() {
@@ -196,13 +185,11 @@ class WeightBloc extends Bloc<WeightEvent, WeightState> {
       Duration(minutes: _autoRefreshIntervalMinutes),
       (_) {
         if (!isClosed && state is! WeightLoading) {
-          // تحديث في الخلفية فقط إذا مرت 30 دقيقة
           if (_lastRefreshTime != null) {
             final age = DateTime.now().difference(_lastRefreshTime!);
             if (age.inMinutes >= _cacheDurationMinutes) {
               add(const LoadWeightsEvent(forceRefresh: true));
             } else {
-              // تحديث خفيف في الخلفية
               add(const LoadWeightsEvent(forceRefresh: false));
             }
           }

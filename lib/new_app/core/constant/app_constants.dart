@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 class AppConstants {
   // TODO: Change this to your actual API base URL
-  static String baseUrl = 'https://lake-oaf-reappear.ngrok-free.dev';
+  static String baseUrl = 'https://joy-change.octo-tech.co';
 
   // App Information
   static const String appName = 'متعة التغير';

@@ -12,7 +12,6 @@ class NotificationSyncService {
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
 
-  // ✅ الحد الأدنى للفاصل الزمني بين المزامنات (5 دقائق)
   static const Duration minSyncInterval = Duration(minutes: 5);
 
   NotificationSyncService(
@@ -22,12 +21,12 @@ class NotificationSyncService {
   );
 
   Future<void> sync({bool force = false}) async {
-    // ✅ منع المزامنة المتكررة
     if (!force && _lastSyncTime != null) {
       final elapsed = DateTime.now().difference(_lastSyncTime!);
       if (elapsed < minSyncInterval) {
         debugPrint(
-            '⏭️ Skipping sync, last sync was ${elapsed.inSeconds} seconds ago');
+          '⏭️ Skipping sync, last sync was ${elapsed.inSeconds} seconds ago',
+        );
         return;
       }
     }
@@ -39,35 +38,52 @@ class NotificationSyncService {
 
     _isSyncing = true;
     _lastSyncTime = DateTime.now();
+
     debugPrint('🔄 Starting notification sync...');
 
     try {
-      final remoteNotifications = await api.getNotifications();
       final localNotifications = await local.getNotifications();
+
+      List<dynamic> remoteNotifications;
+
+      try {
+        // ✅ الآن getNotifications() يرمي exception عند فشل الشبكة
+        //    فيدخل الـ catch الصحيح بدلاً من إرجاع [] خاطئ
+        remoteNotifications = await api.getNotifications();
+      } catch (e) {
+        debugPrint(
+          '📴 No internet or API unavailable. Using local notifications only.',
+        );
+        debugPrint('❌ Sync skipped: $e');
+        return;
+      }
+
+      if (remoteNotifications.isEmpty && localNotifications.isNotEmpty) {
+        debugPrint('⚠️ Remote returned empty list while local cache exists.');
+        debugPrint('⚠️ Skipping delete sync to protect local data.');
+        return;
+      }
 
       final remoteIds = remoteNotifications.map((e) => e.id).toSet();
       final localIds = localNotifications.map((e) => e.id).toSet();
 
-      //----------------------------------
+      //------------------------------------------------------
       // NEW + UPDATE
-      //----------------------------------
+      //------------------------------------------------------
       for (final remote in remoteNotifications) {
         try {
           final exists = await local.exists(remote.id);
           final hiveModel = remote.toHiveModel();
 
           if (!exists) {
-            // إضافة جديدة
             await local.saveNotifications([hiveModel]);
             await scheduler.scheduleNotification(hiveModel);
-
-            // ✅ تحديث isScheduled بعد الجدولة الناجحة
             hiveModel.isScheduled = true;
             await local.updateNotification(hiveModel);
             debugPrint('✅ Added new notification: ${remote.id}');
           } else {
-            // تحديث موجود
             final old = await local.getById(remote.id);
+
             final changed = old?.title != hiveModel.title ||
                 old?.message != hiveModel.message ||
                 old?.sendAt != hiveModel.sendAt ||
@@ -80,42 +96,61 @@ class NotificationSyncService {
               await scheduler.scheduleNotification(hiveModel);
               hiveModel.isScheduled = true;
             }
+
             await local.updateNotification(hiveModel);
           }
-        } catch (e) {
-          debugPrint('❌ Failed to sync notification ${remote.id}: $e');
+        } catch (e, stack) {
+          debugPrint('❌ Failed to sync notification ${remote.id}');
+          debugPrint(e.toString());
+          debugPrint(stack.toString());
         }
       }
 
-      //----------------------------------
+      //------------------------------------------------------
       // DELETED
-      //----------------------------------
+      //------------------------------------------------------
       final deletedIds = localIds.difference(remoteIds);
+
       for (final id in deletedIds) {
-        debugPrint('🗑️ Deleting notification: $id');
-        await scheduler.cancel(id ?? 0);
-        await local.deleteNotification(id ?? 0);
+        // ✅ إصلاح: تخطي الـ null بدل استخدام ?? 0 الذي يلغي id الصفر بالخطأ
+        if (id == null) continue;
+
+        try {
+          debugPrint('🗑️ Deleting removed notification: $id');
+          await scheduler.cancel(id);
+          await local.deleteNotification(id);
+        } catch (e) {
+          debugPrint('❌ Failed deleting notification $id: $e');
+        }
       }
 
-      //----------------------------------
+      //------------------------------------------------------
       // EXPIRED
-      //----------------------------------
+      //------------------------------------------------------
       final now = DateTime.now();
       final currentLocal = await local.getNotifications();
 
       for (final notification in currentLocal) {
-        if (notification.expiresAt != null &&
-            notification.expiresAt!.isBefore(now)) {
-          debugPrint('⏰ Notification expired: ${notification.id}');
-          await scheduler.cancel(notification.id ?? 0);
-          await local.deleteNotification(notification.id ?? 0);
+        // ✅ إصلاح: تخطي الـ null بدل استخدام ?? 0
+        if (notification.id == null) continue;
+
+        try {
+          if (notification.expiresAt != null &&
+              notification.expiresAt!.isBefore(now)) {
+            debugPrint('⏰ Notification expired: ${notification.id}');
+            await scheduler.cancel(notification.id!);
+            await local.deleteNotification(notification.id!);
+          }
+        } catch (e) {
+          debugPrint('❌ Failed processing expired notification: $e');
         }
       }
 
       debugPrint('✅ Sync completed successfully');
-    } catch (e) {
-      debugPrint('❌ Sync error: $e');
-      rethrow;
+    } catch (e, stack) {
+      debugPrint('❌ Unexpected sync error');
+      debugPrint(e.toString());
+      debugPrint(stack.toString());
     } finally {
       _isSyncing = false;
     }

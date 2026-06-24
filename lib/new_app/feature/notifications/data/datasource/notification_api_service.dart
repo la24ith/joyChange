@@ -7,29 +7,27 @@ import '../models/notification_response_model.dart';
 class NotificationApiService {
   final Dio dio;
 
-  NotificationApiService(this.dio, {required DioClient dioClient});
+  // ✅ إصلاح: حذف dioClient غير المستخدم من الـ constructor
+  NotificationApiService(
+    this.dio,
+  );
 
+  // ✅ إصلاح: رمي exception بدل ابتلاعه حتى يتمكن NotificationSyncService
+  //    من التمييز بين "لا إنترنت" و"API أرجع قائمة فارغة فعلاً"
   Future<List<NotificationResponseModel>> getNotifications() async {
-    try {
-      final response = await dio.get('/api/notifications');
+    final response =
+        await dio.get('/api/notifications'); // يرمي DioException عند فشل الشبكة
 
-      if (response.data['data'] == null) {
-        debugPrint('⚠️ No data field in response');
-        return [];
-      }
-
-      final data = response.data['data'] as List;
-      return data
-          .map((e) =>
-              NotificationResponseModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on DioException catch (e) {
-      debugPrint('❌ API Error: ${e.response?.statusCode} - ${e.message}');
-      return [];
-    } catch (e) {
-      debugPrint('❌ Unexpected error: $e');
+    if (response.data['data'] == null) {
+      debugPrint('⚠️ No data field in response');
       return [];
     }
+
+    final data = response.data['data'] as List;
+    return data
+        .map((e) =>
+            NotificationResponseModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> markAllRead() async {
@@ -38,6 +36,7 @@ class NotificationApiService {
       debugPrint('✅ Marked all notifications as read');
     } on DioException catch (e) {
       debugPrint('❌ Mark all read error: ${e.message}');
+      rethrow;
     }
   }
 
@@ -47,6 +46,7 @@ class NotificationApiService {
       debugPrint('✅ Deleted notification: $id');
     } on DioException catch (e) {
       debugPrint('❌ Delete error: ${e.message}');
+      rethrow;
     }
   }
 }

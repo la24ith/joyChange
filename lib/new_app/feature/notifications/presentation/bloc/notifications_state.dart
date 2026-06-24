@@ -12,9 +12,7 @@ abstract class NotificationState extends Equatable {
 class NotificationError extends NotificationState {
   final String message;
 
-  const NotificationError(
-    this.message,
-  );
+  const NotificationError(this.message);
 
   @override
   List<Object?> get props => [message];
@@ -23,9 +21,7 @@ class NotificationError extends NotificationState {
 class NotificationLoaded extends NotificationState {
   final List<NotificationHiveModel> notifications;
 
-  const NotificationLoaded(
-    this.notifications,
-  );
+  const NotificationLoaded(this.notifications);
 
   @override
   List<Object?> get props => [notifications];
@@ -33,8 +29,9 @@ class NotificationLoaded extends NotificationState {
 
 class NotificationLoading extends NotificationState {}
 
-class MarkAllReadloading extends NotificationState {}
+// ✅ إصلاح: تصحيح الأخطاء الإملائية في أسماء الـ states
+class MarkAllReadLoading extends NotificationState {}
 
-class MarkAllReadSuccesfuly extends NotificationState {}
+class MarkAllReadSuccessfully extends NotificationState {}
 
 class NotificationInitial extends NotificationState {}
