@@ -5,7 +5,7 @@ import '../storage/secure_storage.dart';
 
 class UrlHelper {
   // ✅ استخدم ngrok domain الخاص بك
-  static const String _baseUrl = 'https://lake-oaf-reappear.ngrok-free.dev';
+  static const String _baseUrl = 'https://joy-change.octo-tech.co';
 /*
   /// تحويل رابط signed-media إلى HTTPS مع الحفاظ على التوقيع
   static String fixSignedMediaUrl(String? url) {
@@ -62,11 +62,4 @@ class UrlHelper {
   }
 
   /// Headers الثابتة (للاستخدام السريع)
-  static Map<String, String> getStaticHeaders() {
-    return {
-      'ngrok-skip-browser-warning': 'true',
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    };
-  }
 }

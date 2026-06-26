@@ -236,7 +236,12 @@ class AuthRemoteDataSource {
       print('⚠️ Logout API error: $e');
     }
   }
-
+  Future<bool> fetchScreenshotPermission() async {
+    final response = await _dioClient.get(
+      ApiEndpoints.screenshot_permission,
+    );
+    return response.data['can_screenshot'] as bool? ?? false;
+  }
   Future<UserModel> updateProfile({
     String? name,
     String? phone,
@@ -275,4 +280,6 @@ class AuthRemoteDataSource {
       );
     }
   }
+
+
 }

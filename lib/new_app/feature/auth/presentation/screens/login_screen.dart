@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_strings.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/services/screenshot_service.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/entities/user.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
@@ -220,6 +221,10 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 100,
       decoration: BoxDecoration(
         color: Colors.white,
+        image: DecorationImage(
+          image: const AssetImage('assets/icon/icon.png'),
+          fit: BoxFit.contain,
+        ),
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
@@ -229,11 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
-      child: Icon(
-        Icons.fitness_center,
-        size: 50,
-        color: Colors.teal.shade600,
-      ),
+      //  child: Image.asset('assets/icon/icon.png'),
     );
   }
 
@@ -339,13 +340,14 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: _handleLogin,
             ),
             const SizedBox(height: 20),
-            _buildSignUpRow(),
+            //_buildSignUpRow(),
           ],
         ),
       ),
     );
   }
 
+/*
   Widget _buildSignUpRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -374,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ],
     );
   }
-
+*/
   void _handleLogin() async {
     FocusScope.of(context).unfocus();
 
@@ -389,6 +391,8 @@ class _LoginScreenState extends State<LoginScreen> {
               deviceId: deviceId,
             ),
           );
+
+
     }
   }
 

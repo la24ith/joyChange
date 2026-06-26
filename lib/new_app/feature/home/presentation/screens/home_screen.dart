@@ -39,37 +39,46 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOffline = false;
   bool _isSyncing = false;
   bool _showIdealWeight = true;
-
+ String? segment;
   @override
-  void initState() {
-    super.initState();
+ @override
+void initState() {
+  super.initState();
+  _homeBloc = context.read<HomeBloc>();
+  _adsBloc = getIt<AdsBloc>()..add(LoadActiveAdsEvent());
+  _scrollController.addListener(_onScroll);
+  _checkConnectivity();
+  _setupConnectivityListener();
 
-    // ✅ فقط احصل على الـ Bloc، لا تضيف حدث هنا
-    _homeBloc = context.read<HomeBloc>();
-
-    // ✅ لا تضيف FetchPostsEvent هنا لأنه سيضاف في main.dart
-
-    _adsBloc = getIt<AdsBloc>()..add(LoadActiveAdsEvent());
-    _scrollController.addListener(_onScroll);
-    _checkConnectivity();
-    _setupConnectivityListener();
+  // ✅ جلب الـ segment ثم إرسال الحدث
+  final authState = context.read<AuthBloc>().state;
+  String? segment;
+  if (authState is Authenticated) {
+    segment = authState.user.patientSegment;
+    if (segment != null && segment.isEmpty) segment = null;
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _homeBloc.close();
-    _adsBloc.close();
-    super.dispose();
-  }
+  _homeBloc.add(FetchPostsEvent(
+    page: 1,
+    limit: 10,
+    patientSegment: segment, // ✅ هنا يُمرَّر
+  ));
+}
 
+@override
+void dispose() {
+  _scrollController.dispose();
+  // ✅ لا تغلق _homeBloc لأنه مُدار من BlocProvider خارجي
+  _adsBloc.close(); // هذا تمام لأنك أنشأته بـ getIt
+  super.dispose();
+}
   void _onScroll() {
     final state = _homeBloc.state;
 
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       if (state is HomeLoaded && !state.hasReachedMax) {
-        _homeBloc.add(FetchMorePostsEvent());
+        _homeBloc.add(FetchMorePostsEvent( patientSegment: segment,));
       }
     }
 
@@ -79,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final threshold = maxScroll * 0.7;
 
       if (currentScroll >= threshold) {
-        _homeBloc.add(const PrefetchPostsEvent());
+        _homeBloc.add( PrefetchPostsEvent( patientSegment: segment,));
       }
     }
   }
@@ -108,13 +117,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _refreshData() async {
-    setState(() => _isSyncing = true);
-    _homeBloc.add(RefreshPostsEvent());
-    _adsBloc.add(LoadActiveAdsEvent());
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() => _isSyncing = false);
+Future<void> _refreshData() async {
+  setState(() => _isSyncing = true);
+  
+  // ✅ اجلب الـ segment من AuthBloc عند الـ refresh أيضاً
+  final authState = context.read<AuthBloc>().state;
+  String? segment;
+  if (authState is Authenticated) {
+    segment = authState.user.patientSegment;
+    if (segment != null && segment.isEmpty) segment = null;
   }
+  
+  _homeBloc.add(RefreshPostsEvent(patientSegment: segment)); // ✅
+  _adsBloc.add(LoadActiveAdsEvent());
+  await Future.delayed(const Duration(milliseconds: 500));
+  setState(() => _isSyncing = false);
+}
 
   int _getCrossAxisCount(double width) {
     if (width >= 1200) return 4;
@@ -361,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           const SizedBox(height: 8),
                                           ElevatedButton(
                                             onPressed: () => _homeBloc
-                                                .add(FetchMorePostsEvent()),
+                                                .add(FetchMorePostsEvent(patientSegment: segment)),
                                             child: const Text('إعادة المحاولة'),
                                           ),
                                         ],

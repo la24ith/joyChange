@@ -20,7 +20,7 @@ class User extends Equatable {
   final double? targetWeight;
   final bool achievedGoal;
   final DateTime createdAt;
-
+  final bool canScreenshot;
   const User({
     required this.id,
     required this.name,
@@ -31,6 +31,7 @@ class User extends Equatable {
     required this.role,
     required this.patientSegment,
     required this.isActive,
+    required this.canScreenshot,
     this.idealWeight,
     this.currentWeight,
     this.height,
@@ -85,6 +86,7 @@ class User extends Equatable {
         role,
         patientSegment,
         isActive,
+        canScreenshot,
         idealWeight,
         currentWeight,
         height,
@@ -104,6 +106,7 @@ class User extends Equatable {
     String? role,
     String? patientSegment,
     bool? isActive,
+    bool? canScreenshot,
     double? idealWeight,
     double? currentWeight,
     double? height,
@@ -121,6 +124,7 @@ class User extends Equatable {
       role: role ?? this.role,
       patientSegment: patientSegment ?? this.patientSegment,
       isActive: isActive ?? this.isActive,
+      canScreenshot: canScreenshot ?? this.canScreenshot,
       idealWeight: idealWeight ?? this.idealWeight,
       currentWeight: currentWeight ?? this.currentWeight,
       height: height ?? this.height,

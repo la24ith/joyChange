@@ -84,3 +84,29 @@ class ValidationFailure extends Failure {
 class UnknownFailure extends Failure {
   const UnknownFailure({required super.message, super.statusCode});
 }
+
+class PendingSubscriptionFailure extends Failure {
+  final String email;
+  final int userId;
+  final String password;
+
+  const PendingSubscriptionFailure({
+    required super.message,
+    required this.email,
+    required this.userId,
+    this.password = '',
+  });
+}
+
+class PendingDeviceFailure extends Failure {
+  final String email;
+  final String password;
+  final String deviceId;
+
+  const PendingDeviceFailure({
+    required super.message,
+    required this.email,
+    required this.password,
+    required this.deviceId,
+  });
+}

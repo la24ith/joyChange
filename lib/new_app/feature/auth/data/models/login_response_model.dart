@@ -72,25 +72,25 @@ class LoginResponseModel extends Equatable {
     switch (code) {
       case 'NEEDS_SUBSCRIPTION':
         return PendingSubscription(
-          message: message ?? 'Waiting for subscription activation',
+          message: message ?? 'بانتظار تفعيل الاشتراك',
           email: email ?? '',
           userId: userId ?? 0,
         );
 
       case 'SUBSCRIPTION_INACTIVE':
         return SubscriptionInactive(
-          message: message ?? 'Your subscription has expired or is not active',
+          message: message ?? 'اشتراكك منهي او غير مفعل... راجع المدير',
         );
 
       case 'UNAPPROVED_DEVICE':
         return PendingDeviceApproval(
-          message: message ?? 'This device is awaiting approval',
+          message: message ?? 'بانتظار تفعيل جهازك',
           email: email ?? '',
         );
 
       default:
         return InvalidCredentials(
-          message: message ?? 'Invalid email or password',
+          message: message ?? 'خطأ في كلمة السر او الايميل',
         );
     }
   }

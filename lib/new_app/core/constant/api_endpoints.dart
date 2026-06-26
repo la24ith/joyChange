@@ -42,6 +42,7 @@ class ApiEndpoints {
   static const String dailyCommitmentStats = '/api/daily-commitment/stats';
 
   static const String activeAds = '/api/ads/active';
+  static const String screenshot_permission = '/api/user/screenshot-permission';
 
   static String getFullMediaUrl(String? path) {
     if (path == null || path.isEmpty) return '';

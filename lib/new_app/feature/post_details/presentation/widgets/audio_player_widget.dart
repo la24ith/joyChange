@@ -1,8 +1,12 @@
 // lib/features/post_details/presentation/widgets/premium_audio_player.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:joy_of_change_v3/new_app/core/utils/url_helper.dart';
 
 class PremiumAudioPlayer extends StatefulWidget {
   final String audioUrl;
@@ -21,8 +25,10 @@ class PremiumAudioPlayer extends StatefulWidget {
 class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
     with SingleTickerProviderStateMixin {
   final AudioPlayer _audioPlayer = AudioPlayer();
+
   bool _isPlaying = false;
   bool _isLoading = true;
+  bool _hasError = false;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   double _playbackSpeed = 1.0;
@@ -31,32 +37,96 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
   @override
   void initState() {
     super.initState();
-    _initAudio();
     _waveAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
+    _initAudio();
   }
 
   Future<void> _initAudio() async {
-    await _audioPlayer.setSourceUrl(
-      widget.audioUrl,
-    );
-
-    _audioPlayer.onDurationChanged.listen((duration) {
-      setState(() => _duration = duration);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
     });
 
-    _audioPlayer.onPositionChanged.listen((position) {
-      setState(() => _position = position);
-    });
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
 
-    _audioPlayer.onPlayerComplete.listen((_) {
-      setState(() => _isPlaying = false);
-      _position = Duration.zero;
-    });
+      _audioPlayer.onDurationChanged.listen((d) {
+        if (mounted) setState(() => _duration = d);
+      });
+      _audioPlayer.onPositionChanged.listen((p) {
+        if (mounted) setState(() => _position = p);
+      });
+      _audioPlayer.onPlayerComplete.listen((_) {
+        if (mounted) {
+          setState(() {
+            _isPlaying = false;
+            _position = Duration.zero;
+          });
+          _waveAnimationController.stop();
+        }
+      });
+      _audioPlayer.onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
+      });
 
-    setState(() => _isLoading = false);
+      // ✅ استخدام UrlHelper مباشرة — نفس الطريقة التي تعمل مع باقي الـ API
+      final localPath = await _downloadWithAuthHeaders(widget.audioUrl);
+      if (!mounted) return;
+
+      await _audioPlayer.setSource(DeviceFileSource(localPath));
+      debugPrint('✅ Audio loaded from: $localPath');
+
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _hasError = false;
+        });
+    } catch (e) {
+      debugPrint('❌ Audio init error: $e');
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+    }
+  }
+
+  Future<String> _downloadWithAuthHeaders(String url) async {
+    // ✅ Cache: إذا الملف موجود مسبقاً نرجعه مباشرة
+    final dir = await getTemporaryDirectory();
+    final cacheFile = File('${dir.path}/audio_${url.hashCode.abs()}.mp3');
+
+    if (await cacheFile.exists() && await cacheFile.length() > 0) {
+      debugPrint('✅ Using cached audio: ${cacheFile.path}');
+      return cacheFile.path;
+    }
+
+    // ✅ استخدام UrlHelper.getAuthHeaders() مباشرة — يحتوي على كل الـ headers الصحيحة
+    final headers = await UrlHelper.getAuthHeaders();
+    debugPrint('⬇️ Downloading audio...');
+    debugPrint('🔑 Headers: $headers');
+
+    final response = await http
+        .get(Uri.parse(url), headers: headers)
+        .timeout(const Duration(seconds: 60));
+
+    debugPrint('📥 Status: ${response.statusCode}');
+    debugPrint('📥 Content-Type: ${response.headers['content-type']}');
+    debugPrint('📥 Content-Length: ${response.headers['content-length']}');
+
+    if (response.statusCode == 200) {
+      await cacheFile.writeAsBytes(response.bodyBytes);
+      debugPrint(
+          '✅ Saved: ${cacheFile.path} (${response.bodyBytes.length} bytes)');
+      return cacheFile.path;
+    } else {
+      debugPrint('❌ Response body: ${response.body}');
+      throw Exception('Download failed: HTTP ${response.statusCode}');
+    }
   }
 
   @override
@@ -67,33 +137,47 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
   }
 
   Future<void> _togglePlayPause() async {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-      _waveAnimationController.stop();
-    } else {
-      await _audioPlayer.resume();
-      _waveAnimationController.repeat(reverse: true);
+    if (_hasError) {
+      await _initAudio();
+      return;
     }
-    setState(() => _isPlaying = !_isPlaying);
-    HapticFeedback.lightImpact();
+
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+        _waveAnimationController.stop();
+      } else {
+        if (_position >= _duration && _duration > Duration.zero) {
+          await _audioPlayer.seek(Duration.zero);
+        }
+        await _audioPlayer.resume();
+        _waveAnimationController.repeat(reverse: true);
+      }
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      debugPrint('❌ Toggle error: $e');
+      await _initAudio();
+    }
   }
 
   Future<void> _seekTo(Duration position) async {
-    await _audioPlayer.seek(position);
+    try {
+      await _audioPlayer.seek(position);
+    } catch (e) {
+      debugPrint('❌ Seek error: $e');
+    }
   }
 
   Future<void> _changeSpeed() async {
-    setState(() {
-      _playbackSpeed = _playbackSpeed == 1.0 ? 1.5 : 1.0;
-    });
+    setState(() => _playbackSpeed = _playbackSpeed == 1.0 ? 1.5 : 1.0);
     await _audioPlayer.setPlaybackRate(_playbackSpeed);
     HapticFeedback.selectionClick();
   }
 
   String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    final m = duration.inMinutes.remainder(60);
+    final s = duration.inSeconds.remainder(60);
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -117,20 +201,22 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
           children: [
             Row(
               children: [
-                // ✅ Play/Pause Button with Animation
                 GestureDetector(
-                  onTap: _togglePlayPause,
+                  onTap: _isLoading ? null : _togglePlayPause,
                   child: Container(
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.teal.shade400, Colors.teal.shade600],
+                        colors: _hasError
+                            ? [Colors.red.shade400, Colors.red.shade600]
+                            : [Colors.teal.shade400, Colors.teal.shade600],
                       ),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.teal.withOpacity(0.3),
+                          color: (_hasError ? Colors.red : Colors.teal)
+                              .withOpacity(0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -148,16 +234,15 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                             ),
                           )
                         : Icon(
-                            _isPlaying ? Icons.pause : Icons.play_arrow,
+                            _hasError
+                                ? Icons.refresh
+                                : (_isPlaying ? Icons.pause : Icons.play_arrow),
                             color: Colors.white,
                             size: 28,
                           ),
                   ),
                 ),
-
                 const SizedBox(width: 16),
-
-                // ✅ Title and Duration
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,27 +259,29 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _isLoading ? 'جاري التحميل...' : 'بودكاست',
+                        _isLoading
+                            ? 'جاري التحميل...'
+                            : _hasError
+                                ? 'فشل التحميل، اضغط للمحاولة'
+                                : 'بودكاست',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark
-                              ? Colors.white.withOpacity(0.6)
-                              : Colors.black.withOpacity(0.5),
+                          color: _hasError
+                              ? Colors.red.shade400
+                              : (isDark
+                                  ? Colors.white.withOpacity(0.6)
+                                  : Colors.black.withOpacity(0.5)),
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                // ✅ Speed Button
-                if (!_isLoading)
+                if (!_isLoading && !_hasError)
                   GestureDetector(
                     onTap: _changeSpeed,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: isDark
                             ? Colors.white.withOpacity(0.1)
@@ -213,10 +300,7 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                   ),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // ✅ Waveform Visualization
             if (_isPlaying)
               AnimatedBuilder(
                 animation: _waveAnimationController,
@@ -240,9 +324,7 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                   );
                 },
               ),
-
-            // ✅ Progress Slider
-            if (!_isLoading)
+            if (!_isLoading && !_hasError)
               Row(
                 children: [
                   Text(
@@ -256,11 +338,17 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                   ),
                   Expanded(
                     child: Slider(
-                      value: _position.inSeconds.toDouble(),
-                      max: _duration.inSeconds.toDouble(),
-                      onChanged: (value) {
-                        _seekTo(Duration(seconds: value.toInt()));
-                      },
+                      value: (_duration.inSeconds > 0)
+                          ? _position.inSeconds
+                              .toDouble()
+                              .clamp(0, _duration.inSeconds.toDouble())
+                          : 0.0,
+                      max: _duration.inSeconds > 0
+                          ? _duration.inSeconds.toDouble()
+                          : 1.0,
+                      onChanged: _duration.inSeconds > 0
+                          ? (value) => _seekTo(Duration(seconds: value.toInt()))
+                          : null,
                       activeColor: Colors.teal,
                       inactiveColor: isDark
                           ? Colors.white.withOpacity(0.2)

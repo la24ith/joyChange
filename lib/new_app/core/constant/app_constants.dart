@@ -1,6 +1,8 @@
 // lib/core/constants/app_constants.dart
 
 import 'package:flutter/material.dart';
+import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 
 class AppConstants {
   // TODO: Change this to your actual API base URL

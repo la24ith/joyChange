@@ -78,7 +78,8 @@ class DailyCommitmentBloc
 
       _syncDataInBackground();
     } catch (e) {
-      emit(DailyCommitmentError(message: 'Failed to load data: ${e.toString()}'));
+      emit(DailyCommitmentError(
+          message: 'Failed to load data: ${e.toString()}'));
     }
   }
 
@@ -125,10 +126,28 @@ class DailyCommitmentBloc
             : '💪 تم تسجيل إجابتك، غداً يوم جديد',
       ));
 
-      // 🌐 Step 2: Try server directly — only save to pending queue if it fails
-      _submitToServerOrQueue(event);
+      // ✅ Re-emit Loaded so BlocBuilder always has a valid state after Submitted
+      emit(DailyCommitmentLoaded(
+        question: updatedData.question,
+        stats: DailyStats(
+          total: updatedData.totalDays,
+          yes: updatedData.yesCount,
+          no: updatedData.noCount,
+          skipped: updatedData.skippedCount,
+          adherenceRate: updatedData.adherenceRate,
+        ),
+        history: const [],
+        answeredToday: true,
+        todayAnswer: event.answer,
+        isFromCache: true,
+        isSynced: false,
+      ));
+
+      // 🌐 Step 2: Submit to server first, THEN sync — avoids race condition
+      await _submitToServerOrQueue(event);
     } catch (e) {
-      emit(DailyCommitmentError(message: 'Failed to submit answer: ${e.toString()}'));
+      emit(DailyCommitmentError(
+          message: 'Failed to submit answer: ${e.toString()}'));
     }
   }
 
@@ -201,14 +220,21 @@ class DailyCommitmentBloc
             : null;
 
         final localData = await _getLocalDataUseCase();
+
+        // 🛡️ Guard: if user already answered locally, don't let server overwrite it.
+        // This handles the case where sync runs before the server has the new answer.
+        final protectedAnsweredToday = localData.answeredToday || answeredToday;
+        final protectedTodayAnswer =
+            localData.answeredToday ? localData.todayAnswer : todayAnswer;
+
         final updatedData = localData.updateFromServer(
           total: stats.total,
           yes: stats.yes,
           no: stats.no,
           skipped: stats.skipped,
           adherenceRate: stats.adherenceRate,
-          answeredToday: answeredToday,
-          todayAnswer: todayAnswer,
+          answeredToday: protectedAnsweredToday,
+          todayAnswer: protectedTodayAnswer,
         );
         await _saveLocalDataUseCase(updatedData);
 
@@ -235,10 +261,11 @@ class DailyCommitmentBloc
         notes: event.notes,
       ));
 
-      result.fold(
+      await result.fold(
         (failure) async {
           // Network / server error → queue for later retry
-          print('❌ Server submission failed: ${failure.message} — queuing for retry');
+          print(
+              '❌ Server submission failed: ${failure.message} — queuing for retry');
           await _savePendingAnswerUseCase(
             answer: event.answer,
             date: event.date,

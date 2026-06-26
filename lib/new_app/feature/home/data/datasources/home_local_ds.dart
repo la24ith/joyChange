@@ -10,7 +10,18 @@ class HomeLocalDataSource {
   HomeLocalDataSource({Box? postsBox})
       : _postsBox = postsBox ?? Hive.box(StorageKeys.postsBox);
 
-  /// ✅ تحويل عميق لأي Map إلى Map<String, dynamic> بما فيها الـ nested maps
+  // ✅ مفتاح الكاش حسب الـ segment
+  String _cacheKey(String? segment) {
+    final s = (segment == null || segment.isEmpty) ? 'general' : segment;
+    return 'cached_posts_$s';
+  }
+
+  String _lastUpdatedKey(String? segment) {
+    final s = (segment == null || segment.isEmpty) ? 'general' : segment;
+    return 'last_updated_$s';
+  }
+
+  /// تحويل عميق لأي Map إلى Map<String, dynamic>
   Map<String, dynamic> _deepConvert(dynamic map) {
     final result = <String, dynamic>{};
     (map as Map).forEach((key, value) {
@@ -26,21 +37,23 @@ class HomeLocalDataSource {
     return result;
   }
 
-  /// حفظ المنشورات
-  Future<void> savePosts(List<PostModel> posts) async {
+  /// حفظ المنشورات حسب الـ segment
+  Future<void> savePosts(List<PostModel> posts, {String? segment}) async {
     try {
       final postsJson = posts.map((p) => p.toJson()).toList();
-      await _postsBox.put('cached_posts', postsJson);
-      await _postsBox.put('last_updated', DateTime.now().toIso8601String());
+      await _postsBox.put(_cacheKey(segment), postsJson);
+      await _postsBox.put(
+          _lastUpdatedKey(segment), DateTime.now().toIso8601String());
+      print('💾 Saved ${posts.length} posts for segment: $segment');
     } catch (e) {
       print('Error saving posts: $e');
     }
   }
 
-  /// جلب المنشورات المخزنة
-  List<PostModel> getCachedPosts() {
+  /// جلب المنشورات المخزنة حسب الـ segment
+  List<PostModel> getCachedPosts({String? segment}) {
     try {
-      final cached = _postsBox.get('cached_posts');
+      final cached = _postsBox.get(_cacheKey(segment));
       if (cached == null) return [];
 
       if (cached is List) {
@@ -48,7 +61,6 @@ class HomeLocalDataSource {
         for (var item in cached) {
           try {
             if (item is Map) {
-              // ✅ تحويل عميق يشمل author وكل الـ nested maps
               final Map<String, dynamic> json = _deepConvert(item);
               posts.add(PostModel.fromJson(json));
             }
@@ -74,27 +86,40 @@ class HomeLocalDataSource {
   PostModel? getCachedPost(int id) {
     final cached = _postsBox.get('post_$id');
     if (cached == null) return null;
-
     if (cached is Map) {
       return PostModel.fromJson(_deepConvert(cached));
     }
     return null;
   }
 
-  bool hasCachedPosts() {
-    return _postsBox.containsKey('cached_posts');
+  /// التحقق من وجود كاش لـ segment معين
+  bool hasCachedPosts({String? segment}) {
+    return _postsBox.containsKey(_cacheKey(segment));
   }
 
-  DateTime? getLastUpdateTime() {
-    final lastUpdated = _postsBox.get('last_updated');
+  DateTime? getLastUpdateTime({String? segment}) {
+    final lastUpdated = _postsBox.get(_lastUpdatedKey(segment));
     if (lastUpdated != null && lastUpdated is String) {
       return DateTime.tryParse(lastUpdated);
     }
     return null;
   }
 
-  Future<void> clearCache() async {
-    await _postsBox.delete('cached_posts');
-    await _postsBox.delete('last_updated');
+  /// مسح كاش segment معين
+  Future<void> clearCache({String? segment}) async {
+    await _postsBox.delete(_cacheKey(segment));
+    await _postsBox.delete(_lastUpdatedKey(segment));
+  }
+
+  /// مسح كاش كل الـ segments
+  Future<void> clearAllCache() async {
+    final keys = _postsBox.keys
+        .where((k) =>
+            k.toString().startsWith('cached_posts_') ||
+            k.toString().startsWith('last_updated_'))
+        .toList();
+    for (final key in keys) {
+      await _postsBox.delete(key);
+    }
   }
 }

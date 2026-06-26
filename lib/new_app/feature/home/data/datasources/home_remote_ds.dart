@@ -13,23 +13,33 @@ class HomeRemoteDataSource {
   HomeRemoteDataSource({DioClient? dioClient})
       : _dioClient = dioClient ?? DioClient.instance;
 
-  /// Get all posts with pagination
+  /// Get all posts with pagination and optional segment filter
   Future<List<PostModel>> getPosts({
     int page = 1,
-    int limit = 10, // ✅ أضف limit
+    int limit = 10,
+    String? patientSegment, // ✅ تصفية حسب نوع المريض
   }) async {
     try {
+      // ✅ بناء query parameters
+      final queryParams = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+
+      // ✅ إضافة patient_segment فقط إذا كان موجوداً
+      if (patientSegment != null && patientSegment.isNotEmpty) {
+        queryParams['patient_segment'] = patientSegment;
+      }
+
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       print('📤 GET POSTS REQUEST');
-      print('📍 URL: ${ApiEndpoints.posts}?page=$page&limit=$limit');
+      print('📍 URL: ${ApiEndpoints.posts}');
+      print('🔍 Params: $queryParams');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dioClient.get(
         ApiEndpoints.posts,
-        queryParameters: {
-          'page': page,
-          'limit': limit,
-        },
+        queryParameters: queryParams,
       );
 
       print('📥 GET POSTS RESPONSE');
@@ -38,7 +48,7 @@ class HomeRemoteDataSource {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> data = response.data['data'];
-        print('✅ Loaded ${data.length} posts');
+        print('✅ Loaded ${data.length} posts for segment: $patientSegment');
         return data.map((json) => PostModel.fromJson(json)).toList();
       } else {
         throw ServerException(

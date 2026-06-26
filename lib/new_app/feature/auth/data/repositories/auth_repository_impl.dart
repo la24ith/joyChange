@@ -265,4 +265,31 @@ class AuthRepositoryImpl implements AuthRepository {
       ));
     }
   }
+
+  @override
+  Future<void> savePendingState({
+    required String state,
+    required String email,
+    int? userId,
+    String? password,
+    String? deviceId,
+  }) async {
+    await localDataSource.savePendingState(
+      state: state,
+      email: email,
+      userId: userId,
+      password: password,
+      deviceId: deviceId,
+    );
+  }
+
+  @override
+  Future<Map<String, String?>?> getPendingState() async {
+    return await localDataSource.getPendingState();
+  }
+
+  @override
+  Future<void> clearPendingState() async {
+    await localDataSource.clearPendingState();
+  }
 }

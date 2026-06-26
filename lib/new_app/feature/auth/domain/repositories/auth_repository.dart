@@ -78,4 +78,16 @@ abstract class AuthRepository {
     double? height,
     String? patientSegment,
   });
+  // أضف هذه الدوال للـ abstract class
+  Future<void> savePendingState({
+    required String state,
+    required String email,
+    int? userId,
+    String? password,
+    String? deviceId,
+  });
+
+  Future<Map<String, String?>?> getPendingState();
+
+  Future<void> clearPendingState();
 }

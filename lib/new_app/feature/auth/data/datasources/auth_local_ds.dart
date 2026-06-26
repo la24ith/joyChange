@@ -19,6 +19,59 @@ class AuthLocalDataSource {
     Box? userBox,
   })  : _secureStorage = secureStorage,
         _userBox = userBox ?? Hive.box('user_box');
+// أضف هذه الثوابت في أعلى الكلاس
+  static const String _pendingStateKey = 'pending_auth_state';
+  static const String _pendingEmailKey = 'pending_auth_email';
+  static const String _pendingUserIdKey = 'pending_user_id';
+  static const String _pendingPasswordKey = 'pending_password';
+  static const String _pendingDeviceIdKey = 'pending_device_id';
+
+  /// حفظ حالة الانتظار (subscription أو device)
+  Future<void> savePendingState({
+    required String state, // 'PENDING_SUBSCRIPTION' أو 'PENDING_DEVICE'
+    required String email,
+    int? userId,
+    String? password,
+    String? deviceId,
+  }) async {
+    await _secureStorage.write(key: _pendingStateKey, value: state);
+    await _secureStorage.write(key: _pendingEmailKey, value: email);
+    if (userId != null) {
+      await _secureStorage.write(
+          key: _pendingUserIdKey, value: userId.toString());
+    }
+    if (password != null && password.isNotEmpty) {
+      await _secureStorage.write(key: _pendingPasswordKey, value: password);
+    }
+    if (deviceId != null) {
+      await _secureStorage.write(key: _pendingDeviceIdKey, value: deviceId);
+    }
+    print('💾 Pending state saved: $state for $email');
+  }
+
+  /// استرجاع حالة الانتظار
+  Future<Map<String, String?>?> getPendingState() async {
+    final state = await _secureStorage.read(key: _pendingStateKey);
+    if (state == null || state.isEmpty) return null;
+
+    return {
+      'state': state,
+      'email': await _secureStorage.read(key: _pendingEmailKey),
+      'userId': await _secureStorage.read(key: _pendingUserIdKey),
+      'password': await _secureStorage.read(key: _pendingPasswordKey),
+      'deviceId': await _secureStorage.read(key: _pendingDeviceIdKey),
+    };
+  }
+
+  /// مسح حالة الانتظار (عند تسجيل الدخول الناجح)
+  Future<void> clearPendingState() async {
+    await _secureStorage.delete(key: _pendingStateKey);
+    await _secureStorage.delete(key: _pendingEmailKey);
+    await _secureStorage.delete(key: _pendingUserIdKey);
+    await _secureStorage.delete(key: _pendingPasswordKey);
+    await _secureStorage.delete(key: _pendingDeviceIdKey);
+    print('🗑️ Pending state cleared');
+  }
 
   /// ✅ Helper لتقطيع النص بأمان
   String _safeSubstring(String text, int start, int end) {

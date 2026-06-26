@@ -13,18 +13,23 @@ import 'package:joy_of_change_v3/new_app/core/constant/app_theme.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
+import 'package:joy_of_change_v3/new_app/core/observers/screenshot_observer.dart';
 import 'package:joy_of_change_v3/new_app/core/services/local_notification_service.dart';
 import 'package:joy_of_change_v3/new_app/core/services/timezone_service.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/core/workmanager/workmanager_callback.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/data/datasources/auth_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/entities/user.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/repositories/auth_repository.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/bloc/auth_state.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/login_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_device_approval_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/pending_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/profile_setup_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subscription_expired_screen.dart';
+import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/SubscriptionInactiveScreen.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/ideal_weight_splash_screen.dart';
@@ -38,12 +43,22 @@ import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bl
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_state.dart';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
+late final ScreenshotObserver screenshotObserver;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+    final authRemoteDataSource = AuthRemoteDataSource();
 
+  screenshotObserver = ScreenshotObserver(
+    fetchPermission: () async {
+      try {
+        return await authRemoteDataSource.fetchScreenshotPermission();
+      } catch (_) {
+        return false; // في حالة خطأ → امنع التصوير
+      }
+    },
+  );
   try {
-    // ✅ تهيئة Firebase بأمان
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -55,23 +70,8 @@ void main() async {
   }
 
   try {
-    // ============================================================================
-    // ✅ 1. تسجيل Adapters فقط - NO Hive.initFlutter() هنا!
-    // ============================================================================
-
-    // ============================================================================
-    // ✅ 2. تهيئة Service Locator (Hive.initFlutter() ستُستدعى من HiveService)
-    // ============================================================================
     await setupServiceLocator();
-
-    // ============================================================================
-    // ✅ 3. إصلاح حالة البروفايل
-    // ============================================================================
     await _fixProfileStatus();
-
-    // ============================================================================
-    // ✅ 4. باقي التهيئة
-    // ============================================================================
     await TimezoneService.initialize();
 
     final notificationPlugin = await LocalNotificationInitializer.init();
@@ -91,9 +91,7 @@ void main() async {
     debugPrint('📚 StackTrace: $stackTrace');
   }
 
-  runApp(
-    const MyApp(),
-  );
+  runApp(const MyApp());
 }
 
 // ============================================================================
@@ -127,9 +125,6 @@ Future<void> _fixProfileStatus() async {
         if (current != 'true') {
           await secureStorage.write(key: 'profile_completed', value: 'true');
           debugPrint('✅ Auto-fixed profile status for: ${user.email}');
-
-          final fixed = await secureStorage.read(key: 'profile_completed');
-          debugPrint('🔍 After fix: "$fixed"');
         } else {
           debugPrint('✅ Profile status already correct');
         }
@@ -157,38 +152,27 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        // ✅ Auth Bloc
         BlocProvider<AuthBloc>(
-          create: (context) {
-            final authBloc = getIt<AuthBloc>();
-
-            return authBloc;
-          },
+          create: (context) => getIt<AuthBloc>(),
         ),
-
-        // ✅ Home Bloc - جلب البيانات فوراً عند إنشاء الصفحة
         BlocProvider<HomeBloc>(
           create: (context) {
             final homeBloc = getIt<HomeBloc>();
-            // ✅ إضافة حدث جلب البيانات هنا فقط (مرة واحدة)
             homeBloc.add(const FetchPostsEvent(page: 1, limit: 10));
             return homeBloc;
           },
         ),
-
-        // ✅ Notifications Bloc
         BlocProvider<NotificationBloc>(
           create: (context) => getIt<NotificationBloc>()
             ..add(LoadNotifications())
             ..add(SyncNotifications()),
         ),
-
-        // ✅ Weight Bloc
         BlocProvider<WeightBloc>(
           create: (context) => getIt<WeightBloc>()..add(LoadWeightsEvent()),
         ),
       ],
       child: GetMaterialApp(
+        navigatorObservers: [screenshotObserver],
         title: 'Patient Weight Tracker',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -209,9 +193,7 @@ class MyApp extends StatelessWidget {
           GetPage(name: '/login', page: () => const LoginScreen()),
           GetPage(name: '/home', page: () => const NavigationScreen()),
           GetPage(
-            name: '/profile-setup',
-            page: () => const ProfileSetupScreen(),
-          ),
+              name: '/profile-setup', page: () => const ProfileSetupScreen()),
         ],
       ),
     );
@@ -274,6 +256,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
+  // ✅ fallback للوضع offline — يتحقق أيضاً من pending state
   Future<void> _checkCachedSession() async {
     try {
       final authRepository = getIt<AuthRepository>();
@@ -287,7 +270,8 @@ class _SplashScreenState extends State<SplashScreen> {
       if (token != null && token.isNotEmpty && user != null) {
         await _navigateBasedOnProfile(user);
       } else {
-        _navigateToLogin();
+        // ✅ لا توكن → تحقق من pending state يدوياً
+        await _checkPendingStateAndNavigate();
       }
     } catch (e) {
       debugPrint('Cached session error: $e');
@@ -295,16 +279,53 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
+  // ✅ تحقق من pending state مباشرة (للـ offline أو fallback)
+  Future<void> _checkPendingStateAndNavigate() async {
+    try {
+      final authRepository = getIt<AuthRepository>();
+      final pendingState = await authRepository.getPendingState();
+
+      if (pendingState != null) {
+        final state = pendingState['state'];
+        final email = pendingState['email'] ?? '';
+        final userIdStr = pendingState['userId'];
+        final password = pendingState['password'] ?? '';
+        final deviceId = pendingState['deviceId'] ?? '';
+
+        debugPrint('📱 Offline pending state: $state for $email');
+
+        if (state == 'PENDING_SUBSCRIPTION' && mounted) {
+          Get.offAll(() => PendingSubscriptionScreen(
+                message: 'في انتظار تفعيل الاشتراك من قِبل المشرف.',
+                email: email,
+                userId: int.tryParse(userIdStr ?? '0') ?? 0,
+                password: password,
+              ));
+          return;
+        } else if (state == 'PENDING_DEVICE' && mounted) {
+          Get.offAll(() => PendingDeviceApprovalScreen(
+                message: 'هذا الجهاز في انتظار الموافقة من قِبل المشرف.',
+                email: email,
+                password: password,
+              ));
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error checking pending state: $e');
+    }
+
+    _navigateToLogin();
+  }
+
   Future<void> _navigateBasedOnProfile(User user) async {
     if (!mounted) return;
 
     final isComplete = await _isProfileComplete(user);
-    if (isComplete) {
-      if (mounted) {
+    if (mounted) {
+      if (isComplete) {
         Get.offAllNamed('/home');
-      }
-    } else {
-      if (mounted) {
+      } else {
         Get.offAllNamed('/profile-setup');
       }
     }
@@ -340,14 +361,65 @@ class _SplashScreenState extends State<SplashScreen> {
   void _retryCheckSession() {
     if (mounted) {
       try {
-        final authBloc = context.read<AuthBloc>();
-        authBloc.add(CheckSessionEvent());
+        context.read<AuthBloc>().add(CheckSessionEvent());
       } catch (e) {
         debugPrint('⚠️ Error reading AuthBloc: $e');
         setState(() {
           _isChecking = false;
           _statusMessage = 'حدث خطأ، يرجى المحاولة مرة أخرى';
         });
+      }
+    }
+  }
+
+  // ✅ الانتقال إلى PendingSubscriptionScreen مع جلب كلمة المرور
+  Future<void> _navigateToPendingSubscription(PendingSubscription state) async {
+    if (!mounted) return;
+    try {
+      final secureStorage = getIt.get<SecureStorageService>();
+      final password = await secureStorage.read(key: 'pending_password') ?? '';
+      if (mounted) {
+        Get.offAll(() => PendingSubscriptionScreen(
+              message: state.message,
+              email: state.email,
+              userId: state.userId,
+              password: password,
+            ));
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error navigating to pending subscription: $e');
+      if (mounted) {
+        Get.offAll(() => PendingSubscriptionScreen(
+              message: state.message,
+              email: state.email,
+              userId: state.userId,
+              password: '',
+            ));
+      }
+    }
+  }
+
+  // ✅ الانتقال إلى PendingDeviceApprovalScreen مع جلب كلمة المرور
+  Future<void> _navigateToPendingDevice(PendingDeviceApproval state) async {
+    if (!mounted) return;
+    try {
+      final secureStorage = getIt.get<SecureStorageService>();
+      final password = await secureStorage.read(key: 'pending_password') ?? '';
+      if (mounted) {
+        Get.offAll(() => PendingDeviceApprovalScreen(
+              message: state.message,
+              email: state.email,
+              password: password,
+            ));
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error navigating to pending device: $e');
+      if (mounted) {
+        Get.offAll(() => PendingDeviceApprovalScreen(
+              message: state.message,
+              email: state.email,
+              password: '',
+            ));
       }
     }
   }
@@ -366,6 +438,14 @@ class _SplashScreenState extends State<SplashScreen> {
           _handleAuthenticated(state.user);
         } else if (state is Unauthenticated) {
           _navigateToLogin();
+        } else if (state is ProfileIncomplete) {
+          if (mounted) Get.offAllNamed('/profile-setup');
+        } else if (state is SubscriptionInactive) {
+          // ✅ اشتراك منتهٍ
+          if (mounted) {
+            Get.offAll(
+                () => SubscriptionInactiveScreen(message: state.message));
+          }
         } else if (state is AuthError) {
           if (state.message.contains('subscription') ||
               state.message.contains('expired') ||
@@ -379,10 +459,14 @@ class _SplashScreenState extends State<SplashScreen> {
             _isChecking = true;
             _statusMessage = 'جاري التحقق من الجلسة...';
           });
-        } else if (state is ProfileIncomplete) {
-          if (mounted) {
-            Get.offAllNamed('/profile-setup');
-          }
+
+          // ✅ انتظار الاشتراك — كان مفقوداً
+        } else if (state is PendingSubscription) {
+          _navigateToPendingSubscription(state);
+
+          // ✅ انتظار تفعيل الجهاز — كان مفقوداً
+        } else if (state is PendingDeviceApproval) {
+          _navigateToPendingDevice(state);
         }
       },
       child: Scaffold(
@@ -447,20 +531,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
     try {
       final isComplete = await _isProfileComplete(user);
-      if (isComplete) {
-        if (mounted) {
+      if (mounted) {
+        if (isComplete) {
           Get.offAllNamed('/home');
-        }
-      } else {
-        if (mounted) {
+        } else {
           Get.offAllNamed('/profile-setup');
         }
       }
     } catch (e) {
       debugPrint('⚠️ Error in _handleAuthenticated: $e');
-      if (mounted) {
-        Get.offAllNamed('/home');
-      }
+      if (mounted) Get.offAllNamed('/home');
     }
   }
 

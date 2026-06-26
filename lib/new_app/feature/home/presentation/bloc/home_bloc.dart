@@ -21,7 +21,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<FetchMorePostsEvent>(_onFetchMorePosts);
     on<RefreshPostsEvent>(_onRefreshPosts);
   }
-
+  String? _patientSegment;
   Future<void> _onFetchPosts(
     FetchPostsEvent event,
     Emitter<HomeState> emit,
@@ -36,10 +36,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     _currentPage = 1;
     _hasReachedMax = false;
-
+    patientSegment:
+    _patientSegment;
     final result = await getPostsUseCase(GetPostsParams(
       page: _currentPage,
       limit: event.limit,
+      patientSegment: event.patientSegment,
     ));
 
     result.fold(
@@ -89,6 +91,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await getPostsUseCase(GetPostsParams(
       page: nextPage,
       limit: _limit,
+      patientSegment: _patientSegment, // ✅ مرره هنا أيضاً
     ));
 
     result.fold(
@@ -119,6 +122,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await getPostsUseCase(GetPostsParams(
       page: nextPage,
       limit: _limit,
+      patientSegment: _patientSegment, // ✅ مرره هنا أيضاً
     ));
 
     result.fold(
@@ -175,6 +179,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _hasReachedMax = false;
     _currentPage = 1;
     _posts = [];
-    add(const FetchPostsEvent(page: 1, limit: _limit));
+    add(FetchPostsEvent(
+      page: 1,
+      limit: _limit,
+      patientSegment:
+          event.patientSegment ?? _patientSegment, // ✅ مرره هنا أيضاً
+    ));
   }
 }

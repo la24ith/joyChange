@@ -22,98 +22,67 @@ class HomeRepositoryImpl implements HomeRepository {
   Future<Either<Failure, List<Post>>> getPosts({
     int page = 1,
     int limit = 10,
+    String? patientSegment,
   }) async {
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    print('🔍 HomeRepositoryImpl.getPosts called');
-    print('📄 Page: $page, Limit: $limit');
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
     try {
-      // ✅ 1. جلب البيانات من API
-      print('📡 Fetching posts from remote data source...');
-      final posts = await remoteDataSource.getPosts(page: page, limit: limit);
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📡 Fetching posts — page=$page, segment=$patientSegment');
+
+      // ✅ جلب المنشورات من API مع تمرير الـ segment
+      final posts = await remoteDataSource.getPosts(
+        page: page,
+        limit: limit,
+        patientSegment: patientSegment,
+      );
       print('📊 Received ${posts.length} posts from API');
 
-      // ✅ 2. تحويل إلى Entity
-      print('🔄 Converting posts to entities...');
-      final entities = posts.map((p) {
-        print('  📝 Converting: ID=${p.id}, Title=${p.title}');
-        return p.toEntity();
-      }).toList();
-      print('✅ Converted ${entities.length} posts to entities');
+      // ✅ تحويل إلى Entity
+      final entities = posts.map((p) => p.toEntity()).toList();
 
-      // ✅ 3. حفظ في الكاش (للصفحة الأولى فقط)
+      // ✅ حفظ في الكاش للصفحة الأولى فقط — مفتاح مخصص لكل segment
       if (page == 1) {
-        print('💾 Page 1 - Saving to cache...');
         try {
-          await cachePosts(entities);
-          print('✅ Cache save completed');
-
-          // ✅ التحقق من الحفظ
-          final cached = localDataSource.getCachedPosts();
-          print('📦 Cache now has ${cached.length} posts');
-          if (cached.isNotEmpty) {
-            print('📝 First cached post: ${cached.first.title}');
-          }
+          await cachePosts(entities, segment: patientSegment);
+          print(
+              '💾 Cached ${entities.length} posts for segment: $patientSegment');
         } catch (e) {
-          print('⚠️ Failed to save to cache: $e');
+          print('⚠️ Failed to cache: $e');
         }
-      } else {
-        print('⏭️ Page $page - Skipping cache (only page 1 is cached)');
       }
 
-      // ✅ 4. إرجاع البيانات
-      print('✅ Returning ${entities.length} posts to UseCase');
-      if (entities.isNotEmpty) {
-        print('📝 First entity: ${entities.first.title}');
-      }
+      print('✅ Returning ${entities.length} posts');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return Right(entities);
     } on ServerException catch (e) {
-      print('❌ ServerException: ${e.message}, StatusCode: ${e.statusCode}');
+      print('❌ ServerException: ${e.message}');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // ✅ عند فشل الشبكة، حاول استخدام الكاش
-      if (hasCachedPosts()) {
-        print('📦 Cache available, loading from cache...');
-        final cached = getCachedPosts();
+      // ✅ فشل الشبكة → جلب من الكاش الخاص بهذا الـ segment
+      if (page == 1 && hasCachedPosts(segment: patientSegment)) {
+        final cached = getCachedPosts(segment: patientSegment);
         if (cached.isNotEmpty) {
-          print('✅ Loaded ${cached.length} posts from cache');
-          if (page == 1) {
-            return Right(cached);
-          } else {
-            print(
-                '⏭️ Page $page - Returning empty list (cache only has page 1)');
-            return const Right([]);
-          }
+          print(
+              '📦 Loaded ${cached.length} posts from cache (segment: $patientSegment)');
+          return Right(cached);
         }
       }
 
-      print('❌ No cache available');
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
+      print('❌ No cache available for segment: $patientSegment');
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
       print('❌ Unexpected error: $e');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // ✅ أي خطأ آخر، حاول استخدام الكاش
-      if (hasCachedPosts()) {
-        print('📦 Cache available, loading from cache...');
-        final cached = getCachedPosts();
+      if (page == 1 && hasCachedPosts(segment: patientSegment)) {
+        final cached = getCachedPosts(segment: patientSegment);
         if (cached.isNotEmpty) {
-          print('✅ Loaded ${cached.length} posts from cache');
-          if (page == 1) {
-            return Right(cached);
-          } else {
-            print('⏭️ Page $page - Returning empty list');
-            return const Right([]);
-          }
+          print(
+              '📦 Loaded ${cached.length} posts from cache (segment: $patientSegment)');
+          return Right(cached);
         }
       }
 
-      print('❌ No cache available');
+      print('❌ No cache available for segment: $patientSegment');
       return Left(UnknownFailure(
         message: 'لا يوجد اتصال بالإنترنت ولا توجد بيانات محفوظة',
       ));
@@ -122,63 +91,38 @@ class HomeRepositoryImpl implements HomeRepository {
 
   @override
   Future<Either<Failure, Post>> getPostById(int id) async {
-    print('🔍 HomeRepositoryImpl.getPostById: id=$id');
-
+    print('🔍 getPostById: id=$id');
     try {
       final post = await remoteDataSource.getPostById(id);
-      print('✅ Post found: ${post.title}');
       await localDataSource.savePost(post);
-      print('💾 Post saved to cache');
       return Right(post.toEntity());
     } on ServerException catch (e) {
-      print('❌ ServerException: ${e.message}');
       final cached = localDataSource.getCachedPost(id);
-      if (cached != null) {
-        print('📦 Returning cached post: ${cached.title}');
-        return Right(cached.toEntity());
-      }
-      print('❌ No cached post found');
-      return Left(ServerFailure(
-        message: e.message,
-        statusCode: e.statusCode,
-      ));
+      if (cached != null) return Right(cached.toEntity());
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
-      print('❌ Error: $e');
       final cached = localDataSource.getCachedPost(id);
-      if (cached != null) {
-        print('📦 Returning cached post: ${cached.title}');
-        return Right(cached.toEntity());
-      }
-      return Left(UnknownFailure(
-        message: 'لا يوجد اتصال بالإنترنت',
-      ));
+      if (cached != null) return Right(cached.toEntity());
+      return Left(UnknownFailure(message: 'لا يوجد اتصال بالإنترنت'));
     }
   }
 
   @override
-  List<Post> getCachedPosts() {
-    print('🔍 HomeRepositoryImpl.getCachedPosts called');
-    final posts =
-        localDataSource.getCachedPosts().map((p) => p.toEntity()).toList();
-    print('📦 Cache has ${posts.length} posts');
-    return posts;
+  List<Post> getCachedPosts({String? segment}) {
+    return localDataSource
+        .getCachedPosts(segment: segment)
+        .map((p) => p.toEntity())
+        .toList();
   }
 
   @override
-  Future<void> cachePosts(List<Post> posts) async {
-    print('💾 HomeRepositoryImpl.cachePosts called with ${posts.length} posts');
-    final models = posts.map((p) {
-      print('  🔄 Converting: ${p.title}');
-      return PostModel.fromEntity(p);
-    }).toList();
-    await localDataSource.savePosts(models);
-    print('✅ cachePosts completed');
+  Future<void> cachePosts(List<Post> posts, {String? segment}) async {
+    final models = posts.map((p) => PostModel.fromEntity(p)).toList();
+    await localDataSource.savePosts(models, segment: segment);
   }
 
   @override
-  bool hasCachedPosts() {
-    final has = localDataSource.hasCachedPosts();
-    print('🔍 HomeRepositoryImpl.hasCachedPosts: $has');
-    return has;
+  bool hasCachedPosts({String? segment}) {
+    return localDataSource.hasCachedPosts(segment: segment);
   }
 }

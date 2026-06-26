@@ -22,7 +22,39 @@ class CheckSessionUseCase {
     // ✅ ثانياً: الحصول على البيانات المحفوظة
     final token = await repository.getStoredToken();
     final user = await repository.getStoredUser();
+    if (token == null || token.isEmpty) {
+      final pendingState = await repository.getPendingState();
+      if (pendingState != null) {
+        final state = pendingState['state'];
+        final email = pendingState['email'] ?? '';
+        final userIdStr = pendingState['userId'];
+        final password = pendingState['password'] ?? '';
+        final deviceId = pendingState['deviceId'] ?? '';
 
+        print('📱 Found pending state: $state for $email');
+
+        if (state == 'PENDING_SUBSCRIPTION') {
+          return Left(PendingSubscriptionFailure(
+            message: 'في انتظار تفعيل الاشتراك',
+            email: email,
+            userId: int.tryParse(userIdStr ?? '0') ?? 0,
+            password: password,
+          ));
+        } else if (state == 'PENDING_DEVICE') {
+          return Left(PendingDeviceFailure(
+            message: 'في انتظار تفعيل الجهاز',
+            email: email,
+            password: password,
+            deviceId: deviceId,
+          ));
+        }
+      }
+
+      // لا يوجد token ولا pending state
+      return Left(SessionExpiredFailure(
+        message: 'No session found. Please login.',
+      ));
+    }
     // ✅ إذا كان هناك توكن ومستخدم محفوظ
     if (token != null && token.isNotEmpty && user != null) {
       // ✅ التحقق من اكتمال البروفايل من التخزين المحلي

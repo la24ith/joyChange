@@ -7,11 +7,13 @@ import '../repositories/home_repository.dart';
 
 class GetPostsParams {
   final int page;
-  final int limit; // ✅ أضف هذا
+  final int limit;
+  final String? patientSegment; // ✅ segment المريض لتصفية المنشورات
 
   const GetPostsParams({
     this.page = 1,
-    this.limit = 10, // ✅ قيمة افتراضية
+    this.limit = 10,
+    this.patientSegment,
   });
 }
 
@@ -21,10 +23,10 @@ class GetPostsUseCase {
   GetPostsUseCase(this.repository);
 
   Future<Either<Failure, List<Post>>> call(GetPostsParams params) async {
-    // ✅ تمرير limit إلى الـ repository
     return await repository.getPosts(
       page: params.page,
       limit: params.limit,
+      patientSegment: params.patientSegment,
     );
   }
 }

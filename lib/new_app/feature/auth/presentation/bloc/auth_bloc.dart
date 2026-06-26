@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
+import 'package:joy_of_change_v3/new_app/core/services/screenshot_service.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_session_usecase.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_subscription_usecase.dart';
@@ -77,6 +78,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(const Unauthenticated());
         } else if (failure is SubscriptionExpiredFailure) {
           emit(SubscriptionInactive(message: failure.message));
+        } else if (failure is PendingSubscriptionFailure) {
+          // ✅ استعادة حالة انتظار الاشتراك
+          emit(PendingSubscription(
+            message: failure.message,
+            email: failure.email,
+            userId: failure.userId,
+          ));
+          // ✅ ابدأ الـ polling تلقائياً
+          _startSubscriptionPolling(emit, failure.email);
+        } else if (failure is PendingDeviceFailure) {
+          // ✅ استعادة حالة انتظار الجهاز
+          emit(PendingDeviceApproval(
+            message: failure.message,
+            email: failure.email,
+          ));
+          // ✅ ابدأ الـ polling تلقائياً
+          if (failure.deviceId.isNotEmpty) {
+            _startDevicePolling(emit, failure.email, failure.deviceId);
+          }
         } else {
           await _emitCachedState(emit);
         }
@@ -162,15 +182,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthError(message: failure.message));
         add(ClearAuthErrorEvent());
       },
-      (response) {
+      (response) async {
         final state = response.toAuthState();
         emit(state);
-
         if (state is PendingSubscription) {
+          // ✅ احفظ الحالة محلياً
+          _authRepository.savePendingState(
+            state: 'PENDING_SUBSCRIPTION',
+            email: state.email,
+            userId: state.userId,
+            password: event.password, // تحتاج تمرير password من LoginEvent
+          );
+          _startSubscriptionPolling(emit, state.email);
           add(StartSubscriptionPollingEvent(email: state.email));
         } else if (state is PendingDeviceApproval) {
+          // ✅ احفظ الحالة محلياً
+          _authRepository.savePendingState(
+            state: 'PENDING_DEVICE',
+            email: state.email,
+            password: event.password,
+            deviceId: event.deviceId,
+          );
+          _startDevicePolling(emit, state.email, event.deviceId);
           add(StartDevicePollingEvent(
               email: state.email, deviceId: event.deviceId));
+        } else if (state is Authenticated) {
+              await ScreenshotService.apply(state.user.canScreenshot); // ← هنا
+
+          _authRepository.clearPendingState();
         }
       },
     );
@@ -206,7 +245,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         print('📧 Email: ${registerResult.email}');
         print('🆔 UserId: ${registerResult.userId}');
         print('💬 Message: ${registerResult.message}');
-
+        _authRepository.savePendingState(
+          state: 'PENDING_SUBSCRIPTION',
+          email: registerResult.email,
+          userId: registerResult.userId,
+          password: event.password, // تمرير كلمة المرور
+        );
         emit(PendingSubscription(
           message: registerResult.message,
           email: registerResult.email,
@@ -393,6 +437,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } catch (e) {
         print('⚠️ Logout API error (ignored): $e');
       }
+      await _authRepository.clearPendingState();
 
       // ✅ إرسال الحالة النهائية
       emit(const Unauthenticated());

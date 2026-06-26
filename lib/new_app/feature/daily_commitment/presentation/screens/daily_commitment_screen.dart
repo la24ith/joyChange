@@ -32,7 +32,6 @@ class _DailyCommitmentView extends StatefulWidget {
 }
 
 class _DailyCommitmentViewState extends State<_DailyCommitmentView> {
-  bool _hasAnswered = false;
   bool _isSubmitting = false;
   bool? _selectedAnswer;
   String? _feedbackMessage;
@@ -49,7 +48,6 @@ class _DailyCommitmentViewState extends State<_DailyCommitmentView> {
           if (state is DailyCommitmentSubmitted) {
             setState(() {
               _isSubmitting = false;
-              _hasAnswered = true;
               _feedbackMessage = state.message;
             });
 
@@ -74,16 +72,6 @@ class _DailyCommitmentViewState extends State<_DailyCommitmentView> {
                 behavior: SnackBarBehavior.floating,
               ),
             );
-          }
-
-          if (state is DailyCommitmentLoaded) {
-            // Check if already answered today
-            final isAnswered = state.answeredToday;
-            if (isAnswered != _hasAnswered) {
-              setState(() {
-                _hasAnswered = isAnswered;
-              });
-            }
           }
         },
         child: BlocBuilder<DailyCommitmentBloc, DailyCommitmentState>(
