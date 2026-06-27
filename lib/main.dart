@@ -13,8 +13,8 @@ import 'package:joy_of_change_v3/new_app/core/constant/app_theme.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/hive_boxes.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
-import 'package:joy_of_change_v3/new_app/core/observers/screenshot_observer.dart';
 import 'package:joy_of_change_v3/new_app/core/services/local_notification_service.dart';
+import 'package:joy_of_change_v3/new_app/core/services/screenshot_service.dart';
 import 'package:joy_of_change_v3/new_app/core/services/timezone_service.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/core/workmanager/workmanager_callback.dart';
@@ -41,23 +41,13 @@ import 'package:joy_of_change_v3/new_app/feature/notifications/presentation/bloc
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_event.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bloc/weight_state.dart';
+import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
-late final ScreenshotObserver screenshotObserver;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-    final authRemoteDataSource = AuthRemoteDataSource();
 
-  screenshotObserver = ScreenshotObserver(
-    fetchPermission: () async {
-      try {
-        return await authRemoteDataSource.fetchScreenshotPermission();
-      } catch (_) {
-        return false; // في حالة خطأ → امنع التصوير
-      }
-    },
-  );
   try {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
@@ -72,6 +62,7 @@ void main() async {
   try {
     await setupServiceLocator();
     await _fixProfileStatus();
+
     await TimezoneService.initialize();
 
     final notificationPlugin = await LocalNotificationInitializer.init();
@@ -145,8 +136,54 @@ Future<void> _fixProfileStatus() async {
 // ✅ MyApp
 // ============================================================================
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  Timer? _screenshotTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // فحص فوري عند بدء التطبيق
+    _syncScreenshot();
+    // ثم كل دقيقتين
+    _screenshotTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _syncScreenshot(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _screenshotTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // فحص فوري عند رجوع المستخدم للتطبيق من الخلفية
+    if (state == AppLifecycleState.resumed) {
+      _syncScreenshot();
+    }
+  }
+
+  Future<void> _syncScreenshot() async {
+    try {
+      final canScreenshot =
+          await getIt<AuthRemoteDataSource>().fetchScreenshotPermission();
+      await ScreenshotService.apply(canScreenshot);
+      debugPrint('📸 Screenshot synced: $canScreenshot');
+    } catch (e) {
+      debugPrint('📸 Screenshot sync error: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +209,6 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: GetMaterialApp(
-        navigatorObservers: [screenshotObserver],
         title: 'Patient Weight Tracker',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(

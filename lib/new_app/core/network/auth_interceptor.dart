@@ -6,7 +6,9 @@ import '../di/service_locator.dart';
 import '../storage/secure_storage.dart';
 
 class AuthInterceptor extends Interceptor {
-  final SecureStorageService _secureStorage = getIt<SecureStorageService>();
+  // ✅ Lazy getter — resolved only when onRequest() is actually called,
+  //    by which point setupServiceLocator() has fully completed.
+  SecureStorageService get _secureStorage => getIt<SecureStorageService>();
 
   @override
   void onRequest(
@@ -14,7 +16,6 @@ class AuthInterceptor extends Interceptor {
     final shouldSkipAuth = options.path.contains('/auth/login') ||
         options.path.contains('/auth/register');
 
-    options.headers['ngrok-skip-browser-warning'] = 'true';
     options.headers['User-Agent'] = 'Mozilla/5.0';
 
     if (!shouldSkipAuth) {
