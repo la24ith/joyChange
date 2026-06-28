@@ -28,7 +28,7 @@ class AddWeightUseCase {
 
     if (params.weight > 500) {
       return Left(
-          ValidationFailure(message: 'الوزن يجب أن يكون أقل من 500 كجم'));
+          ValidationFailure(message: 'الوزن يجب أن يكون أقل من 500 كغ'));
     }
 
     if (params.date.isAfter(DateTime.now())) {

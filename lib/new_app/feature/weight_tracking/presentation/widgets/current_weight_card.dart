@@ -84,7 +84,7 @@ class CurrentWeightCard extends StatelessWidget {
                 _buildInfoItem(
                   'آخر قياس',
                   status.latestWeight != null
-                      ? '${status.latestWeight!.toStringAsFixed(1)} كجم'
+                      ? '${status.latestWeight!.toStringAsFixed(1)} كغ'
                       : '--',
                   Icons.history,
                   isTablet,

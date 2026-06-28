@@ -175,13 +175,13 @@ class IdealStatusModel extends Equatable {
 
   String get formattedProgress => '${(progress * 100).toStringAsFixed(1)}%';
   String get formattedCurrentWeight =>
-      currentWeight != null ? '${currentWeight!.toStringAsFixed(1)} كجم' : '--';
+      currentWeight != null ? '${currentWeight!.toStringAsFixed(1)} كغ' : '--';
   String get formattedTargetWeight =>
-      targetWeight != null ? '${targetWeight!.toStringAsFixed(1)} كجم' : '--';
+      targetWeight != null ? '${targetWeight!.toStringAsFixed(1)} كغ' : '--';
   String get formattedIdealWeight =>
-      idealWeight != null ? '${idealWeight!.toStringAsFixed(1)} كجم' : '--';
+      idealWeight != null ? '${idealWeight!.toStringAsFixed(1)} كغ' : '--';
   String get formattedRemaining => remainingToGoal != null
-      ? '${remainingToGoal!.toStringAsFixed(1)} كجم'
+      ? '${remainingToGoal!.toStringAsFixed(1)} كغ'
       : '--';
 
   @override

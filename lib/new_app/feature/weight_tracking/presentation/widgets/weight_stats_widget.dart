@@ -33,7 +33,7 @@ class WeightStatsWidget extends StatelessWidget {
         _StatCard(
           title: 'أول قياس',
           value: stats.firstWeight != null
-              ? '${stats.firstWeight!.toStringAsFixed(1)} كجم'
+              ? '${stats.firstWeight!.toStringAsFixed(1)} كغ'
               : '--',
           icon: Icons.arrow_back,
           color: Colors.orange,
@@ -42,7 +42,7 @@ class WeightStatsWidget extends StatelessWidget {
         _StatCard(
           title: 'آخر قياس',
           value: stats.latestWeight != null
-              ? '${stats.latestWeight!.toStringAsFixed(1)} كجم'
+              ? '${stats.latestWeight!.toStringAsFixed(1)} كغ'
               : '--',
           icon: Icons.arrow_forward,
           color: Colors.green,

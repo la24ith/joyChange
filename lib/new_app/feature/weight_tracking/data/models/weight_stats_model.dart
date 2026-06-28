@@ -94,7 +94,7 @@ class WeightStatsModel extends Equatable {
   String get formattedChange {
     if (change == null) return '--';
     final prefix = change! > 0 ? '+' : '';
-    return '$prefix${change!.toStringAsFixed(1)} كجم';
+    return '$prefix${change!.toStringAsFixed(1)} كغ';
   }
 
   @override

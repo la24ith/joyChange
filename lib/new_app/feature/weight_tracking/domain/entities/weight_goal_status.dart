@@ -148,13 +148,13 @@ class WeightGoalStatus extends Equatable {
   bool get hasIdealWeight => idealWeight != null && idealWeight! > 0;
 
   String get formattedCurrentWeight =>
-      currentWeight != null ? '${currentWeight!.toStringAsFixed(1)} كجم' : '--';
+      currentWeight != null ? '${currentWeight!.toStringAsFixed(1)} كغ' : '--';
 
   String get formattedTargetWeight =>
-      targetWeight != null ? '${targetWeight!.toStringAsFixed(1)} كجم' : '--';
+      targetWeight != null ? '${targetWeight!.toStringAsFixed(1)} كغ' : '--';
 
   String get formattedRemaining => remainingToGoal != null
-      ? '${remainingToGoal!.toStringAsFixed(1)} كجم'
+      ? '${remainingToGoal!.toStringAsFixed(1)} كغ'
       : '--';
 
   String get formattedProgress => '${(progress * 100).toStringAsFixed(1)}%';

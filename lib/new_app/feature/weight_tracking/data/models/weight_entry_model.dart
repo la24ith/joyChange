@@ -135,22 +135,31 @@ class WeightEntryModel extends Equatable {
   }
 
   String get formattedWeight {
-    return '${weight.toStringAsFixed(1)} كجم';
+    return '${weight.toStringAsFixed(1)} كغ';
   }
 
   String get dayName {
     switch (recordedDate.weekday) {
-      case 1: return 'الإثنين';
-      case 2: return 'الثلاثاء';
-      case 3: return 'الأربعاء';
-      case 4: return 'الخميس';
-      case 5: return 'الجمعة';
-      case 6: return 'السبت';
-      case 7: return 'الأحد';
-      default: return '';
+      case 1:
+        return 'الإثنين';
+      case 2:
+        return 'الثلاثاء';
+      case 3:
+        return 'الأربعاء';
+      case 4:
+        return 'الخميس';
+      case 5:
+        return 'الجمعة';
+      case 6:
+        return 'السبت';
+      case 7:
+        return 'الأحد';
+      default:
+        return '';
     }
   }
 
   @override
-  List<Object?> get props => [id, weight, recordedDate, recordedBy, notes, bmi, createdAt];
+  List<Object?> get props =>
+      [id, weight, recordedDate, recordedBy, notes, bmi, createdAt];
 }

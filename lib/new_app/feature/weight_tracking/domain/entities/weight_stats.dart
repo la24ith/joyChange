@@ -43,7 +43,7 @@ class WeightStats extends Equatable {
   String get formattedChange {
     if (change == null) return '--';
     final prefix = change! > 0 ? '+' : '';
-    return '$prefix${change!.toStringAsFixed(1)} كجم';
+    return '$prefix${change!.toStringAsFixed(1)} كغ';
   }
 
   Color get changeColor {
@@ -61,10 +61,10 @@ class WeightStats extends Equatable {
   }
 
   String get formattedFirstWeight =>
-      firstWeight != null ? '${firstWeight!.toStringAsFixed(1)} كجم' : '--';
+      firstWeight != null ? '${firstWeight!.toStringAsFixed(1)} كغ' : '--';
 
   String get formattedLatestWeight =>
-      latestWeight != null ? '${latestWeight!.toStringAsFixed(1)} كجم' : '--';
+      latestWeight != null ? '${latestWeight!.toStringAsFixed(1)} كغ' : '--';
 
   @override
   List<Object?> get props => [entries, firstWeight, latestWeight, change];

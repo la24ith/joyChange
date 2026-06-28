@@ -175,7 +175,7 @@ class WeightChartWidget extends StatelessWidget {
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
                         return LineTooltipItem(
-                          '${spot.y.toStringAsFixed(1)} كجم',
+                          '${spot.y.toStringAsFixed(1)} كغ',
                           const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

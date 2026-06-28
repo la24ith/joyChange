@@ -56,7 +56,7 @@ class WeightEntry extends Equatable {
   }
 
   String get formattedWeight {
-    return '${weight.toStringAsFixed(1)} كجم';
+    return '${weight.toStringAsFixed(1)} كغ';
   }
 
   String get dayName {

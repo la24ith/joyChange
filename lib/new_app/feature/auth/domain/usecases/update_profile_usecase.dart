@@ -54,7 +54,7 @@ class UpdateProfileUseCase {
       }
       if (params.currentWeight! > 500) {
         return Left(ValidationFailure(
-          message: 'الوزن لا يمكن أن يتجاوز 500 كجم',
+          message: 'الوزن لا يمكن أن يتجاوز 500 كغ',
         ));
       }
     }
@@ -68,7 +68,7 @@ class UpdateProfileUseCase {
       }
       if (params.targetWeight! > 500) {
         return Left(ValidationFailure(
-          message: 'الوزن المستهدف لا يمكن أن يتجاوز 500 كجم',
+          message: 'الوزن المستهدف لا يمكن أن يتجاوز 500 كغ',
         ));
       }
     }

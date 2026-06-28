@@ -66,7 +66,7 @@ class _AddWeightBottomSheetState extends State<AddWeightBottomSheet> {
             TextFormField(
               controller: _weightController,
               decoration: InputDecoration(
-                labelText: 'الوزن (كجم)',
+                labelText: 'الوزن (كغ)',
                 prefixIcon: const Icon(Icons.monitor_weight),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -79,7 +79,7 @@ class _AddWeightBottomSheetState extends State<AddWeightBottomSheet> {
                 }
                 final weight = double.tryParse(value);
                 if (weight == null || weight < 20 || weight > 500) {
-                  return 'الوزن يجب أن يكون بين 20 و 500 كجم';
+                  return 'الوزن يجب أن يكون بين 20 و 500 كغ';
                 }
                 return null;
               },

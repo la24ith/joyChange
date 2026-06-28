@@ -95,7 +95,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return 'يرجى إدخال وزن صحيح';
     }
     if (weight > 500) {
-      return 'الوزن لا يمكن أن يتجاوز 500 كجم';
+      return 'الوزن لا يمكن أن يتجاوز 500 كغ';
     }
     return null;
   }
@@ -315,7 +315,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       const SizedBox(height: 14),
                       CustomTextField(
                         controller: _currentWeightController,
-                        labelText: 'الوزن الحالي (كجم)',
+                        labelText: 'الوزن الحالي (كغ)',
                         prefixIcon: Icons.monitor_weight_outlined,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
@@ -325,7 +325,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       const SizedBox(height: 14),
                       CustomTextField(
                         controller: _targetWeightController,
-                        labelText: 'الوزن المستهدف (كجم)',
+                        labelText: 'الوزن المستهدف (كغ)',
                         prefixIcon: Icons.flag_outlined,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),

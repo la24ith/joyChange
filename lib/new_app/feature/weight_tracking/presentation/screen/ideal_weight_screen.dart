@@ -359,7 +359,7 @@ class _IdealWeightPageState extends State<IdealWeightPage>
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${goal.idealWeight!.toStringAsFixed(1)} كجم',
+                                    '${goal.idealWeight!.toStringAsFixed(1)} كغ',
                                     style: const TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
@@ -429,7 +429,7 @@ class _IdealWeightPageState extends State<IdealWeightPage>
 
 الوزن الحالي: ${goal.formattedCurrentWeight}
 الهدف: ${goal.formattedTargetWeight}
-${goal.idealWeight != null ? 'الوزن المثالي: ${goal.idealWeight!.toStringAsFixed(1)} كجم' : ''}
+${goal.idealWeight != null ? 'الوزن المثالي: ${goal.idealWeight!.toStringAsFixed(1)} كغ' : ''}
 
 أنا فخور بإنجازي في رحلة اللياقة!
 #رحلة_التغيير #الوزن_المثالي

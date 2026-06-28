@@ -59,8 +59,10 @@ class WeightChartModel extends Equatable {
   bool get hasValidData => hasData && series.length == labels.length;
   int get dataCount => series.length;
 
-  double? get minValue => series.isEmpty ? null : series.reduce((a, b) => a < b ? a : b);
-  double? get maxValue => series.isEmpty ? null : series.reduce((a, b) => a > b ? a : b);
+  double? get minValue =>
+      series.isEmpty ? null : series.reduce((a, b) => a < b ? a : b);
+  double? get maxValue =>
+      series.isEmpty ? null : series.reduce((a, b) => a > b ? a : b);
   double? get latestValue => series.isEmpty ? null : series.last;
   double? get firstValue => series.isEmpty ? null : series.first;
 
@@ -73,22 +75,25 @@ class WeightChartModel extends Equatable {
     final change = totalChange;
     if (change == null) return '--';
     final prefix = change > 0 ? '+' : '';
-    return '$prefix${change.toStringAsFixed(1)} كجم';
+    return '$prefix${change.toStringAsFixed(1)} كغ';
   }
 
   List<Map<String, dynamic>> getChartPoints() {
     if (!hasValidData) return [];
-    return List.generate(series.length, (index) => {
-      'index': index,
-      'label': _formatDate(labels[index]),
-      'value': series[index],
-    });
+    return List.generate(
+        series.length,
+        (index) => {
+              'index': index,
+              'label': _formatDate(labels[index]),
+              'value': series[index],
+            });
   }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final diff = today.difference(DateTime(date.year, date.month, date.day)).inDays;
+    final diff =
+        today.difference(DateTime(date.year, date.month, date.day)).inDays;
     if (diff == 0) return 'اليوم';
     if (diff == 1) return 'أمس';
     if (diff < 7) return 'منذ $diff أيام';
@@ -128,5 +133,6 @@ class WeightChartModel extends Equatable {
   List<Object?> get props => [labels, series];
 
   @override
-  String toString() => 'WeightChartModel(labels: ${labels.length}, series: ${series.length}, hasData: $hasData)';
+  String toString() =>
+      'WeightChartModel(labels: ${labels.length}, series: ${series.length}, hasData: $hasData)';
 }
