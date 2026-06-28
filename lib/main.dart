@@ -4,6 +4,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
@@ -44,6 +45,7 @@ import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bl
 import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,10 +68,7 @@ void main() async {
     await TimezoneService.initialize();
 
     final notificationPlugin = await LocalNotificationInitializer.init();
-    await notificationPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+    // ✅ طلب إذن الإشعارات يتم من داخل SplashScreen بعد بناء الـ UI
 
     await registerNotificationSync();
 
@@ -209,8 +208,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ),
       ],
       child: GetMaterialApp(
-        title: 'Patient Weight Tracker',
+        title: 'متتبع وزن المريض',
         debugShowCheckedModeBanner: false,
+        // ✅ دعم اللغة العربية والاتجاه من اليمين لليسار
+        locale: const Locale('ar', 'SA'),
+        supportedLocales: const [
+          Locale('ar', 'SA'),
+          Locale('en', 'US'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        builder: (context, child) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          );
+        },
         theme: ThemeData(
           primarySwatch: Colors.blue,
           useMaterial3: true,
@@ -255,9 +271,66 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _requestNotificationPermission();
       _checkConnectivity();
     });
+  }
+
+  // ✅ طلب إذن الإشعارات بشكل صحيح على Android
+  Future<void> _requestNotificationPermission() async {
+    if (!Platform.isAndroid) return;
+
+    final status = await Permission.notification.status;
+    debugPrint('🔔 Notification permission status: $status');
+
+    if (status.isGranted) {
+      debugPrint('✅ Notification permission already granted');
+      return;
+    }
+
+    if (status.isPermanentlyDenied) {
+      // المستخدم رفض بشكل دائم → وجّهه للإعدادات
+      debugPrint(
+          '⚠️ Notification permission permanently denied → opening settings');
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text(
+              'تفعيل الإشعارات',
+              textAlign: TextAlign.right,
+            ),
+            content: const Text(
+              'يحتاج التطبيق إذن الإشعارات لإرسال التنبيهات.\nيرجى تفعيله من إعدادات الجهاز.',
+              textAlign: TextAlign.right,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('لاحقاً'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await openAppSettings();
+                },
+                child: const Text(
+                  'فتح الإعدادات',
+                  style: TextStyle(color: Colors.teal),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // إذن لم يُطلب بعد أو مرفوض مرة واحدة → اطلبه
+    final result = await Permission.notification.request();
+    debugPrint('🔔 Notification permission result: $result');
   }
 
   Future<void> _checkConnectivity() async {
