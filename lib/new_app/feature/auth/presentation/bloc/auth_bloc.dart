@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
+import 'package:joy_of_change_v3/new_app/core/services/fcm_service.dart';
 import 'package:joy_of_change_v3/new_app/core/services/screenshot_service.dart';
 import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/usecases/check_session_usecase.dart';
@@ -207,7 +208,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           add(StartDevicePollingEvent(
               email: state.email, deviceId: event.deviceId));
         } else if (state is Authenticated) {
-              await ScreenshotService.apply(state.user.canScreenshot); // ← هنا
+          await ScreenshotService.apply(state.user.canScreenshot); // ← هنا
 
           _authRepository.clearPendingState();
         }
@@ -418,7 +419,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutEvent event,
     Emitter<AuthState> emit,
   ) async {
-    // ✅ منع التنفيذ المتكرر
     if (_isLoggingOut) {
       print('⚠️ Logout already in progress, skipping...');
       return;
@@ -431,19 +431,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       _pollingTimer = null;
       _pollingCount = 0;
 
-      // ✅ محاولة تسجيل الخروج من API (مع تجاهل الأخطاء)
+      // ✅ إلغاء FCM token — لا يصل إشعار بعد الخروج
+      try {
+        await getIt<FcmService>().unregisterToken();
+      } catch (e) {
+        print('⚠️ FCM unregister error (ignored): $e');
+      }
+
+      // ✅ تسجيل الخروج من API
       try {
         await _authRepository.logout();
       } catch (e) {
         print('⚠️ Logout API error (ignored): $e');
       }
+
       await _authRepository.clearPendingState();
 
-      // ✅ إرسال الحالة النهائية
       emit(const Unauthenticated());
     } catch (e) {
       print('❌ Logout error: $e');
-      // ✅ في حالة أي خطأ، ننظف الحالة
       emit(const Unauthenticated());
     } finally {
       _isLoggingOut = false;

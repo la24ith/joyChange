@@ -69,6 +69,7 @@ import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notif
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/repository/notification_repository_impl.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/domain/entities/repository/notification_repository.dart';
 import '../network/dio_client.dart';
+import '../services/fcm_service.dart';
 import '../storage/hive_service.dart';
 import '../storage/secure_storage.dart';
 import '../utils/device_info.dart';
@@ -406,8 +407,12 @@ Future<void> setupServiceLocator() async {
     () => NotificationLocalDataSourceImpl(notificationBox),
   );
 
+  // ✅ إصلاح: استخدم الـ plugin المسجّل مسبقاً في main.dart
+  // بدلاً من إنشاء instance جديد فارغ بدون تهيئة
   getIt.registerLazySingleton<NotificationSchedulerService>(
-    () => NotificationSchedulerService(FlutterLocalNotificationsPlugin()),
+    () => NotificationSchedulerService(
+      getIt<FlutterLocalNotificationsPlugin>(),
+    ),
   );
 
   getIt.registerLazySingleton<NotificationSyncService>(
@@ -433,7 +438,17 @@ Future<void> setupServiceLocator() async {
   debugPrint('✅ Notifications feature registered');
 
   // ============================================================================
-  // ✅ 14. Drawer Feature
+  // ✅ 14. FCM Service
+  // ============================================================================
+
+  // ✅ يستخدم نفس Dio المُعدّ بالـ baseUrl والـ auth token
+  getIt.registerLazySingleton<FcmService>(
+    () => FcmService(getIt<DioClient>().dio),
+  );
+  debugPrint('✅ FCM service registered');
+
+  // ============================================================================
+  // ✅ 15. Drawer Feature
   // ============================================================================
 
   getIt.registerLazySingleton<SubscriptionRemoteDataSource>(

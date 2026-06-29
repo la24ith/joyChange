@@ -45,7 +45,18 @@ import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/bl
 import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:joy_of_change_v3/new_app/core/services/fcm_service.dart';
+
+// ✅ يجب أن تكون top-level function خارج أي class
+// تعمل عند وصول إشعار FCM والتطبيق مغلق تماماً
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('📩 FCM Background: ${message.notification?.title}');
+  // الإشعار يظهر تلقائياً من FCM — لا حاجة لـ flutter_local_notifications هنا
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,24 +67,28 @@ void main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
+
+    // ✅ سجّل background handler فور تهيئة Firebase وقبل أي شيء آخر
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e, stackTrace) {
     debugPrint('🔥 Firebase init error: $e');
     debugPrint('📚 StackTrace: $stackTrace');
   }
 
   try {
+    // ✅ الـ plugin يُسجَّل أولاً قبل setupServiceLocator
+    // لأن NotificationSchedulerService يحتاجه عند تسجيله في getIt
+    final notificationPlugin = await LocalNotificationInitializer.init();
+    getIt
+        .registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
+
+    // ✅ إصلاح timezone قبل setupServiceLocator
+    await TimezoneService.initialize();
+
     await setupServiceLocator();
     await _fixProfileStatus();
 
-    await TimezoneService.initialize();
-
-    final notificationPlugin = await LocalNotificationInitializer.init();
-    // ✅ طلب إذن الإشعارات يتم من داخل SplashScreen بعد بناء الـ UI
-
     await registerNotificationSync();
-
-    getIt
-        .registerSingleton<FlutterLocalNotificationsPlugin>(notificationPlugin);
 
     debugPrint('✅ All initializations completed successfully');
   } catch (e, stackTrace) {
@@ -639,6 +654,11 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     try {
+      // ✅ سجّل FCM token عند نجاح الـ session — لا يعطّل الـ UI
+      getIt<FcmService>().initAndRegister().catchError((e) {
+        debugPrint('⚠️ FCM registration error (non-fatal): $e');
+      });
+
       final isComplete = await _isProfileComplete(user);
       if (mounted) {
         if (isComplete) {
