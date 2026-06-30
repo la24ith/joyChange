@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 class ScreenshotService {
   static const _channel = MethodChannel(
-    'com.example.joy_of_change_v3/screenshot',
+    'com.joyofchange.patient/screenshot',
   );
 
   static Future<void> apply(bool canScreenshot) async {

@@ -7,7 +7,6 @@ import '../datasource/notification_local_data_source.dart';
 
 import '../models/notification_hive_model.dart';
 
-import '../../../../core/services/notification_scheduler_service.dart';
 import '../../../../core/services/notification_sync_service.dart';
 
 class NotificationRepositoryImpl implements NotificationRepository {
@@ -17,13 +16,13 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   final NotificationSyncService syncService;
 
-  final NotificationSchedulerService scheduler;
-
+  // ملاحظة: لا يوجد scheduler بعد الآن.
+  // FCM هو المصدر الوحيد لعرض الإشعارات — هذا الـ repository
+  // يدير فقط القائمة المحلية المعروضة في شاشة الإشعارات.
   NotificationRepositoryImpl({
     required this.api,
     required this.local,
     required this.syncService,
-    required this.scheduler,
   });
 
   @override
@@ -40,15 +39,12 @@ class NotificationRepositoryImpl implements NotificationRepository {
   Stream<List<NotificationHiveModel>> watchNotifications() {
     final box = Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
 
-    // ✅ أضف StreamController لإرسال القيم الحالية فور الاشتراك
     return Stream<List<NotificationHiveModel>>.multi((controller) {
-      // أرسل البيانات الحالية فوراً
       final current = box.values.toList()
         ..sort((a, b) =>
             (b.sentAt ?? DateTime(1970)).compareTo(a.sentAt ?? DateTime(1970)));
       controller.add(current);
 
-      // ثم استمع للتغييرات
       final sub = box.watch().listen((_) {
         final updated = box.values.toList()
           ..sort((a, b) => (b.sentAt ?? DateTime(1970))
@@ -68,12 +64,8 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
     for (final notification in notifications) {
       notification.isRead = true;
-
       notification.readAt = DateTime.now();
-
-      await local.updateNotification(
-        notification,
-      );
+      await local.updateNotification(notification);
     }
   }
 
@@ -81,16 +73,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
   Future<void> deleteNotification(
     int notificationId,
   ) async {
-    await api.deleteNotification(
-      notificationId,
-    );
-
-    await scheduler.cancel(
-      notificationId,
-    );
-
-    await local.deleteNotification(
-      notificationId,
-    );
+    await api.deleteNotification(notificationId);
+    await local.deleteNotification(notificationId);
   }
 }

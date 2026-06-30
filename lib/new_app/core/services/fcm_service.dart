@@ -4,17 +4,18 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FcmService {
   final Dio dio;
+  final FlutterLocalNotificationsPlugin localNotifications;
 
-  FcmService(this.dio);
+  FcmService(this.dio, this.localNotifications);
 
   /// استدعِ هذه عند نجاح الـ session أو تسجيل الدخول
   Future<void> initAndRegister() async {
     try {
-      // طلب الصلاحية — iOS يحتاجها، Android 13+ يحتاجها
       final settings = await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
@@ -22,34 +23,95 @@ class FcmService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
-        debugPrint('📵 FCM: Permission denied by user');
+        debugPrint('FCM: Permission denied by user');
         return;
       }
 
-      // جلب الـ token وإرساله للـ server
       await _registerToken();
 
-      // استمع لتجديد الـ token تلقائياً عند انتهاء صلاحيته
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        debugPrint('🔄 FCM: Token refreshed');
+        debugPrint('FCM: Token refreshed');
         await _sendTokenToServer(newToken);
       });
+
+      // Foreground handler — الباك يرسل data-only payload (متعمد)
+      // لذلك Android لا يعرضه تلقائياً — يجب عرضه يدوياً هنا
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+
+      // عند الضغط على الإشعار والتطبيق في الخلفية
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+
+      // عند فتح التطبيق من إشعار وهو كان مغلقاً تماماً
+      final initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        _handleNotificationTap(initialMessage);
+      }
     } catch (e) {
-      debugPrint('❌ FCM initAndRegister error: $e');
+      debugPrint('FCM initAndRegister error: $e');
     }
+  }
+
+  /// يُستدعى عندما يصل إشعار FCM والتطبيق مفتوح (foreground)
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    debugPrint('FCM Foreground message: ${message.data}');
+
+    final title =
+        message.notification?.title ?? message.data['title'] ?? 'إشعار جديد';
+    final body = message.notification?.body ?? message.data['message'] ?? '';
+
+    final notificationId =
+        int.tryParse(message.data['notification_id']?.toString() ?? '') ??
+            DateTime.now().millisecondsSinceEpoch.remainder(100000);
+
+    try {
+      await localNotifications.show(
+        notificationId,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'notifications_v2', // ← نفس الـ channel المُنشأ في LocalNotificationInitializer
+            'App Notifications',
+            channelDescription: 'إشعارات التطبيق',
+            icon: 'ic_notification',
+            sound: RawResourceAndroidNotificationSound('notification_sound'),
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: message.data['notification_id']?.toString(),
+      );
+      debugPrint('Foreground notification displayed: $notificationId');
+    } catch (e) {
+      debugPrint('Failed to show foreground notification: $e');
+    }
+  }
+
+  /// يُستدعى عند الضغط على الإشعار (من الخلفية أو من حالة الإغلاق)
+  void _handleNotificationTap(RemoteMessage message) {
+    debugPrint('Notification tapped: ${message.data}');
+    // حالياً يكفي فتح التطبيق — لا حاجة لتنقل خاص
   }
 
   Future<void> _registerToken() async {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) {
-        debugPrint('⚠️ FCM: Token is null');
+        debugPrint('FCM: Token is null');
         return;
       }
-      debugPrint('📱 FCM Token: $token');
+      debugPrint('FCM: Token obtained successfully');
       await _sendTokenToServer(token);
     } catch (e) {
-      debugPrint('❌ FCM: Failed to get token: $e');
+      debugPrint('FCM: Failed to get token: $e');
     }
   }
 
@@ -63,27 +125,25 @@ class FcmService {
         },
       );
 
-      // احفظ الـ token محلياً لاستخدامه عند logout
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('fcm_token', token);
 
-      debugPrint('✅ FCM: Token registered on server');
+      debugPrint('FCM: Token registered on server');
     } on DioException catch (e) {
-      // لا نرمي exception — فشل تسجيل الـ token لا يجب أن يوقف التطبيق
-      debugPrint('⚠️ FCM: Failed to send token to server: ${e.message}');
+      debugPrint('FCM: Failed to send token to server: ${e.message}');
     } catch (e) {
-      debugPrint('⚠️ FCM: Unexpected error sending token: $e');
+      debugPrint('FCM: Unexpected error sending token: $e');
     }
   }
 
-  /// استدعِ هذه عند logout لإيقاف الإشعارات على هذا الجهاز
+  /// استدعِ هذه عند logout
   Future<void> unregisterToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('fcm_token');
 
       if (token == null) {
-        debugPrint('⚠️ FCM: No saved token to unregister');
+        debugPrint('FCM: No saved token to unregister');
         return;
       }
 
@@ -93,11 +153,11 @@ class FcmService {
       );
 
       await prefs.remove('fcm_token');
-      debugPrint('✅ FCM: Token unregistered from server');
+      debugPrint('FCM: Token unregistered from server');
     } on DioException catch (e) {
-      debugPrint('⚠️ FCM: Failed to unregister token: ${e.message}');
+      debugPrint('FCM: Failed to unregister token: ${e.message}');
     } catch (e) {
-      debugPrint('⚠️ FCM: Unexpected error unregistering token: $e');
+      debugPrint('FCM: Unexpected error unregistering token: $e');
     }
   }
 }

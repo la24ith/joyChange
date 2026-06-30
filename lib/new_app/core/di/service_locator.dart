@@ -7,7 +7,6 @@ import 'package:get_it/get_it.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
-import 'package:joy_of_change_v3/new_app/core/services/notification_scheduler_service.dart';
 import 'package:joy_of_change_v3/new_app/core/services/notification_sync_service.dart';
 import 'package:joy_of_change_v3/new_app/feature/ads/data/datasources/ads_remote_ds.dart';
 import 'package:joy_of_change_v3/new_app/feature/ads/data/repositories/ads_repository_impl.dart';
@@ -407,19 +406,13 @@ Future<void> setupServiceLocator() async {
     () => NotificationLocalDataSourceImpl(notificationBox),
   );
 
-  // ✅ إصلاح: استخدم الـ plugin المسجّل مسبقاً في main.dart
-  // بدلاً من إنشاء instance جديد فارغ بدون تهيئة
-  getIt.registerLazySingleton<NotificationSchedulerService>(
-    () => NotificationSchedulerService(
-      getIt<FlutterLocalNotificationsPlugin>(),
-    ),
-  );
-
+  // ملاحظة: لا يوجد NotificationSchedulerService بعد الآن.
+  // FCM هو المصدر الوحيد لعرض الإشعارات (عبر FcmService).
+  // هذا الجزء يدير فقط قائمة الإشعارات المعروضة في شاشة الإشعارات.
   getIt.registerLazySingleton<NotificationSyncService>(
     () => NotificationSyncService(
       getIt<NotificationApiService>(),
       getIt<NotificationLocalDataSource>(),
-      getIt<NotificationSchedulerService>(),
     ),
   );
 
@@ -428,7 +421,6 @@ Future<void> setupServiceLocator() async {
       api: getIt<NotificationApiService>(),
       local: getIt<NotificationLocalDataSource>(),
       syncService: getIt<NotificationSyncService>(),
-      scheduler: getIt<NotificationSchedulerService>(),
     ),
   );
 
@@ -443,7 +435,10 @@ Future<void> setupServiceLocator() async {
 
   // ✅ يستخدم نفس Dio المُعدّ بالـ baseUrl والـ auth token
   getIt.registerLazySingleton<FcmService>(
-    () => FcmService(getIt<DioClient>().dio),
+    () => FcmService(
+      getIt<DioClient>().dio,
+      getIt<FlutterLocalNotificationsPlugin>(),
+    ),
   );
   debugPrint('✅ FCM service registered');
 
