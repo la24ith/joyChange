@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "339988423803",
-    "project_id": "joyofchange-8385b",
-    "storage_bucket": "joyofchange-8385b.firebasestorage.app"
+    "project_number": "780691774720",
+    "project_id": "joy-of-change-production",
+    "storage_bucket": "joy-of-change-production.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:339988423803:android:07ccf7d0f397d89ea5eede",
+        "mobilesdk_app_id": "1:780691774720:android:efa27621895598e12a67e5",
         "android_client_info": {
-          "package_name": "com.example.joy_of_change_v3"
+          "package_name": "com.joyofchange.patient"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCIwrcF_WJg3vi-o7cLAA7pUCxmRUu4nhI"
+          "current_key": "AIzaSyBbojy_ymwByjT22CtMI9u0sLgODwre1qY"
         }
       ],
       "services": {

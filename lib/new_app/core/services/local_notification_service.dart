@@ -5,7 +5,7 @@ class LocalNotificationInitializer {
     final plugin = FlutterLocalNotificationsPlugin();
 
     const android = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
+      '@mipmap/launcher_icon',
     );
 
     const ios = DarwinInitializationSettings();

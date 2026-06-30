@@ -1,6 +1,6 @@
-// android/app/src/main/kotlin/.../MainActivity.kt
+// android/app/src/main/kotlin/com/joyofchange/patient/MainActivity.kt
 
-package com.example.joy_of_change_v3
+package com.joyofchange.patient
 
 import android.os.Bundle
 import android.view.WindowManager
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
-    private val CHANNEL = "com.example.joy_of_change_v3/screenshot"
+    private val CHANNEL = "com.joyofchange.patient/screenshot"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

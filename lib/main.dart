@@ -94,6 +94,7 @@ void main() async {
   } catch (e, stackTrace) {
     debugPrint('❌ Fatal initialization error: $e');
     debugPrint('📚 StackTrace: $stackTrace');
+    if (kDebugMode) rethrow;
   }
 
   runApp(const MyApp());
