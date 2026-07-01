@@ -17,6 +17,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     on<RefreshNotifications>(_onRefreshNotifications);
     on<MarkAllReadNotifications>(_onMarkAllRead);
     on<DeleteNotificationEvent>(_onDeleteNotification);
+    on<ReadNotificationEvent>(_onReadNotification);
     on<NotificationsUpdated>(_onNotificationsUpdated);
   }
 
@@ -88,6 +89,19 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   ) async {
     try {
       await repository.deleteNotification(event.notificationId);
+    } catch (e) {
+      if (!isClosed) {
+        emit(NotificationError(e.toString()));
+      }
+    }
+  }
+
+  Future<void> _onReadNotification(
+    ReadNotificationEvent event,
+    Emitter<NotificationState> emit,
+  ) async {
+    try {
+      await repository.readNotification(event.notificationId);
     } catch (e) {
       if (!isClosed) {
         emit(NotificationError(e.toString()));

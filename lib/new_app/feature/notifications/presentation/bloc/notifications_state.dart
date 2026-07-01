@@ -34,4 +34,8 @@ class MarkAllReadLoading extends NotificationState {}
 
 class MarkAllReadSuccessfully extends NotificationState {}
 
+class MarkReadLoading extends NotificationState {}
+
+class MarkReadSuccessfully extends NotificationState {}
+
 class NotificationInitial extends NotificationState {}

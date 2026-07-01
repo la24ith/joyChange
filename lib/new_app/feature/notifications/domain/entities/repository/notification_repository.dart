@@ -12,4 +12,8 @@ abstract class NotificationRepository {
   Future<void> deleteNotification(
     int notificationId,
   );
+
+  Future<void> readNotification(
+    int notificationId,
+  );
 }

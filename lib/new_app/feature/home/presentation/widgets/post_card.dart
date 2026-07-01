@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_colors.dart';
 import '../../domain/entities/post.dart';
 
@@ -42,7 +43,7 @@ class PostCard extends StatelessWidget {
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(20)),
               child: CachedNetworkImage(
-                imageUrl: post.thumbnailUrl ?? '',
+                imageUrl: ApiEndpoints.mediaUrl(post.thumbnailUrl!),
                 height: imageHeight,
                 width: double.infinity,
                 fit: BoxFit.cover,

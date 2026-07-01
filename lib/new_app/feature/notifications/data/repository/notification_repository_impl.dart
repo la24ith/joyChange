@@ -70,6 +70,18 @@ class NotificationRepositoryImpl implements NotificationRepository {
   }
 
   @override
+  Future<void> readNotification(int notificationId) async {
+    await api.readNotification(notificationId);
+
+    final notification = await local.getById(notificationId);
+    if (notification != null) {
+      notification.isRead = true;
+      notification.readAt = DateTime.now();
+      await local.updateNotification(notification);
+    }
+  }
+
+  @override
   Future<void> deleteNotification(
     int notificationId,
   ) async {

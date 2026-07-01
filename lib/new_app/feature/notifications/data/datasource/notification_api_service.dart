@@ -40,6 +40,16 @@ class NotificationApiService {
     }
   }
 
+  Future<void> readNotification(int notificationId) async {
+    try {
+      await dio.put('/api/notifications/$notificationId/read');
+      debugPrint('✅ Marked notification as read: $notificationId');
+    } on DioException catch (e) {
+      debugPrint('❌ Read notification error: ${e.message}');
+      rethrow;
+    }
+  }
+
   Future<void> deleteNotification(int id) async {
     try {
       await dio.delete('/api/notifications/$id');

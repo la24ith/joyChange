@@ -30,6 +30,17 @@ class DeleteNotificationEvent extends NotificationEvent {
   List<Object?> get props => [notificationId];
 }
 
+class ReadNotificationEvent extends NotificationEvent {
+  final int notificationId;
+
+  const ReadNotificationEvent(
+    this.notificationId,
+  );
+
+  @override
+  List<Object?> get props => [notificationId];
+}
+
 class MarkAllReadNotifications extends NotificationEvent {}
 
 class RefreshNotifications extends NotificationEvent {}
