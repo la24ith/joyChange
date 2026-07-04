@@ -4,11 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:joy_of_change_v3/new_app/core/utils/url_helper.dart';
+import 'package:joy_of_change_v3/new_app/core/utils/media_source_helper.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/audio_player_widget.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/image_viewer.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/video_player_widget.dart';
+import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/youtube_player_widget.dart';
+import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/drive_preview_widget.dart';
+import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/external_link_card.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../../domain/entities/media.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 
 class PremiumMediaGallery extends StatefulWidget {
   final List<Media> media;
@@ -87,11 +92,15 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
     _indicatorController.forward(from: 0.0);
   }
 
+  // استبدل التوقيع والجسم الحاليين
   void _showImageViewer(List<Media> media, int initialIndex) {
     final imageMedia = media.where((m) => m.type == MediaType.image).toList();
     if (imageMedia.isEmpty) return;
 
-    final imageUrls = imageMedia.map((m) => m.url).toList();
+    // ✅ نفس التطبيع المستخدم فعليًا في الكاروسيل (https + Google Drive)
+    final imageUrls =
+        imageMedia.map((m) => ApiEndpoints.mediaUrl(m.url)).toList();
+
     final clickedMedia = media[initialIndex];
     final imageIndex = imageMedia.indexWhere((m) => m.id == clickedMedia.id);
 
@@ -105,12 +114,15 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
         pageBuilder: (_, __, ___) => PremiumImageViewer(
           imageUrls: imageUrls,
           initialIndex: imageIndex,
+          headers: _headers, // ✅ تمرير نفس هيدرز المصادقة المستخدمة في الجاليري
         ),
       ),
     );
   }
 
   // ✅ تحويل إلى Widget عادي (غير Future)
+  // ✅ الآن يحدد أولاً مصدر الرابط (يوتيوب / غوغل درايف / منصة أخرى / رابط مباشر)
+  // قبل أن يقرر أي ويدجت يستخدم لعرضه
   Widget _buildMediaWidget(Media media) {
     var secureUrl = media.url;
     secureUrl = secureUrl.replaceFirst(
@@ -118,10 +130,22 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
       'https://',
     );
 
-    switch (media.type) {
-      case MediaType.image:
+    final sourceType = MediaSourceHelper.detect(secureUrl, media.type);
+
+    switch (sourceType) {
+      // ✅ فيديو يوتيوب - مشغل مدمج داخل التطبيق
+      case MediaSourceType.youtube:
+        return YoutubeEmbedPlayer(videoUrl: secureUrl);
+
+      // ✅ فيديو أو ملف عام من غوغل درايف - معاينة عبر WebView
+      case MediaSourceType.googleDriveVideo:
+      case MediaSourceType.googleDriveGeneric:
+        return GoogleDrivePreview(driveUrl: secureUrl);
+
+      // ✅ صورة من غوغل درايف - تعرض مباشرة (أبسط وأسرع من WebView)
+      case MediaSourceType.googleDriveImage:
         return CachedNetworkImage(
-          imageUrl: secureUrl,
+          imageUrl: ApiEndpoints.mediaUrl(secureUrl),
           httpHeaders: _headers,
           fit: BoxFit.cover,
           width: double.infinity,
@@ -135,10 +159,38 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
             child: const Icon(Icons.broken_image, size: 48),
           ),
         );
-      case MediaType.video:
-        return PremiumVideoPlayer(videoUrl: secureUrl);
-      case MediaType.audio:
-        return PremiumAudioPlayer(audioUrl: secureUrl, title: media.fileName);
+
+      // ✅ منصة أخرى معروفة (Vimeo، فيسبوك، تيك توك...) - بطاقة "رابط خارجي"
+      case MediaSourceType.externalLink:
+        return ExternalLinkCard(url: secureUrl, title: media.fileName);
+
+      // ✅ رابط مباشر عادي - نفس السلوك السابق حسب نوع الميديا من الباك-إند
+      case MediaSourceType.directImage:
+      case MediaSourceType.directVideo:
+      case MediaSourceType.directAudio:
+        switch (media.type) {
+          case MediaType.image:
+            return CachedNetworkImage(
+              imageUrl: secureUrl,
+              httpHeaders: _headers,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              placeholder: (_, __) => Container(
+                color: Colors.grey[200],
+                child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+              errorWidget: (_, __, ___) => Container(
+                color: Colors.grey[200],
+                child: const Icon(Icons.broken_image, size: 48),
+              ),
+            );
+          case MediaType.video:
+            return PremiumVideoPlayer(videoUrl: secureUrl);
+          case MediaType.audio:
+            return PremiumAudioPlayer(
+                audioUrl: secureUrl, title: media.fileName);
+        }
     }
   }
 

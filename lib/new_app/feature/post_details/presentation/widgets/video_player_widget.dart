@@ -1,6 +1,7 @@
 // lib/features/post_details/presentation/widgets/premium_video_player.dart
 
 import 'package:flutter/material.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/utils/url_helper.dart';
 import '../../../../core/di/service_locator.dart';
@@ -53,11 +54,10 @@ class _PremiumVideoPlayerState extends State<PremiumVideoPlayer>
     try {
       // ✅ استخدام networkUrl مباشرة (streaming بدون تحميل كامل)
       _controller = VideoPlayerController.networkUrl(
-        Uri.parse(videoUrl),
+        Uri.parse(ApiEndpoints.mediaUrl(videoUrl)),
         httpHeaders: {
           'Authorization': 'Bearer $token',
           'X-Device-Id': deviceId ?? '',
-          'ngrok-skip-browser-warning': 'true',
           'Range': 'bytes=0-',
         },
       );

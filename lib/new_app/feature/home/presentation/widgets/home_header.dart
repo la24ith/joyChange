@@ -100,6 +100,22 @@ class HomeHeader extends StatelessWidget {
     );
   }
 
+  // ✅ حذف الإشعارات التي انتهت مدتها (expiresAt) من التخزين المحلي
+  Future<void> _purgeExpiredNotifications(
+    Box<NotificationHiveModel> box,
+  ) async {
+    final now = DateTime.now();
+    final expired = box.values.where(
+      (n) => n.expiresAt != null && n.expiresAt!.isBefore(now),
+    );
+
+    for (final n in expired.toList()) {
+      if (n.id != null) {
+        await box.delete(n.id);
+      }
+    }
+  }
+
   Widget buildNotificationButton() {
     // ✅ استخدام HiveService للحصول على الصندوق
     Box<NotificationHiveModel> box;
@@ -136,11 +152,21 @@ class HomeHeader extends StatelessWidget {
       }
     }
 
+    // ✅ حذف الإشعارات المنتهية فور فتح التطبيق (best-effort، لا يعطل الواجهة)
+    _purgeExpiredNotifications(box);
+
     return ValueListenableBuilder(
       valueListenable: box.listenable(),
       builder: (context, Box<NotificationHiveModel> box, _) {
-        final unreadCount =
-            box.values.where((n) => !(n.isRead ?? false)).length;
+        final now = DateTime.now();
+        // ✅ عدد الإشعارات "غير المقروءة" فقط، مع استبعاد المنتهية الصلاحية
+        final unreadCount = box.values
+            .where(
+              (n) =>
+                  !(n.isRead ?? false) &&
+                  (n.expiresAt == null || n.expiresAt!.isAfter(now)),
+            )
+            .length;
 
         return Stack(
           clipBehavior: Clip.none,

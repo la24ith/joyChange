@@ -36,8 +36,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     _currentPage = 1;
     _hasReachedMax = false;
-    patientSegment:
-    _patientSegment;
+    _patientSegment = event.patientSegment;
     final result = await getPostsUseCase(GetPostsParams(
       page: _currentPage,
       limit: event.limit,
@@ -70,7 +69,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           print('✅ Emitted HomeLoaded with ${_posts.length} posts');
 
           if (!_hasReachedMax && !_isPrefetching) {
-            add(const PrefetchPostsEvent());
+            add(PrefetchPostsEvent(patientSegment: _patientSegment));
           }
         }
       },
@@ -91,7 +90,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await getPostsUseCase(GetPostsParams(
       page: nextPage,
       limit: _limit,
-      patientSegment: _patientSegment, // ✅ مرره هنا أيضاً
+      patientSegment: event.patientSegment, // ✅ مرره هنا أيضاً
     ));
 
     result.fold(
@@ -122,7 +121,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await getPostsUseCase(GetPostsParams(
       page: nextPage,
       limit: _limit,
-      patientSegment: _patientSegment, // ✅ مرره هنا أيضاً
+      patientSegment: event.patientSegment, // ✅ مرره هنا أيضاً
     ));
 
     result.fold(

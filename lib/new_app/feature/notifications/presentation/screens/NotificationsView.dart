@@ -112,13 +112,10 @@ class NotificationsView extends StatelessWidget {
                         ),
                       ),
                       onDismissed: (_) {
+                        // ✅ إصلاح: إزالة استدعاء "قراءة" مكرر وخاطئ بعد الحذف
+                        //    (كان يحاول تعليم إشعار محذوف كمقروء)
                         context.read<NotificationBloc>().add(
                               DeleteNotificationEvent(
-                                notification.id ?? 0,
-                              ),
-                            );
-                        context.read<NotificationBloc>().add(
-                              ReadNotificationEvent(
                                 notification.id ?? 0,
                               ),
                             );

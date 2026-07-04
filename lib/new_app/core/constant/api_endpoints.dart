@@ -58,4 +58,38 @@ class ApiEndpoints {
     // بناء الرابط النهائي
     return '$cleanBase/storage/$cleanPath';
   }
+
+  // استبدل mediaUrl الحالية بهذه النسخة الموحّدة
+  static String mediaUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+
+    // رابط نسبي قادم من الباك-إند بدون http
+    if (!url.startsWith('http')) {
+      return getFullMediaUrl(url);
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+
+    final isGoogleDrive = uri.host.contains('drive.google.com') ||
+        uri.host.contains('docs.google.com');
+
+    if (isGoogleDrive) {
+      final patterns = [
+        RegExp(r'/d/([a-zA-Z0-9_-]+)'),
+        RegExp(r'id=([a-zA-Z0-9_-]+)'),
+      ];
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(url);
+        if (match != null) {
+          final fileId = match.group(1)!;
+          return 'https://drive.google.com/uc?export=download&id=$fileId&confirm=t';
+        }
+      }
+      return url;
+    }
+
+    // أي رابط آخر: فرض https دائمًا (بدل تكرار replaceFirst في كل ويدجت)
+    return url.replaceFirst('http://', 'https://');
+  }
 }

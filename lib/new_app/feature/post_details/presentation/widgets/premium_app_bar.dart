@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 
 class PremiumAppBar extends StatelessWidget {
   final String title;
@@ -79,7 +80,7 @@ class PremiumAppBar extends StatelessWidget {
           children: [
             if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
               CachedNetworkImage(
-                imageUrl: thumbnailUrl!,
+                imageUrl: ApiEndpoints.mediaUrl(thumbnailUrl!),
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
                   color: isDark ? Colors.grey[900] : Colors.grey[200],

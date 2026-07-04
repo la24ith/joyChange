@@ -25,14 +25,24 @@ class NotificationRepositoryImpl implements NotificationRepository {
     required this.syncService,
   });
 
-  @override
-  Future<void> syncNotifications() async {
-    await syncService.sync();
+  // ✅ إشعار يُعتبر "نشط" فقط إذا لم تنتهِ مدته بعد (expiresAt)
+  bool _isActive(NotificationHiveModel n) {
+    final expiresAt = n.expiresAt;
+    return expiresAt == null || expiresAt.isAfter(DateTime.now());
   }
 
   @override
-  Future<List<NotificationHiveModel>> getNotifications() {
-    return local.getNotifications();
+  Future<void> syncNotifications() async {
+    await syncService.sync();
+    // ✅ حذف الإشعارات المنتهية فعلياً من التخزين المحلي بعد كل مزامنة
+    await local.clearExpiredNotifications();
+  }
+
+  @override
+  Future<List<NotificationHiveModel>> getNotifications() async {
+    final all = await local.getNotifications();
+    // ✅ استبعاد الإشعارات المنتهية من القائمة المعروضة
+    return all.where(_isActive).toList();
   }
 
   @override
@@ -40,13 +50,13 @@ class NotificationRepositoryImpl implements NotificationRepository {
     final box = Hive.box<NotificationHiveModel>(StorageKeys.notificationsBox);
 
     return Stream<List<NotificationHiveModel>>.multi((controller) {
-      final current = box.values.toList()
+      final current = box.values.where(_isActive).toList()
         ..sort((a, b) =>
             (b.sentAt ?? DateTime(1970)).compareTo(a.sentAt ?? DateTime(1970)));
       controller.add(current);
 
       final sub = box.watch().listen((_) {
-        final updated = box.values.toList()
+        final updated = box.values.where(_isActive).toList()
           ..sort((a, b) => (b.sentAt ?? DateTime(1970))
               .compareTo(a.sentAt ?? DateTime(1970)));
         controller.add(updated);

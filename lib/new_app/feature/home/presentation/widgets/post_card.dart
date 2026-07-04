@@ -42,27 +42,7 @@ class PostCard extends StatelessWidget {
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(20)),
-              child: CachedNetworkImage(
-                imageUrl: ApiEndpoints.mediaUrl(post.thumbnailUrl!),
-                height: imageHeight,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  height: imageHeight,
-                  color: AppColors.surfaceVariant,
-                  child: const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  height: imageHeight,
-                  color: AppColors.surfaceVariant,
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
+              child: _buildThumbnail(imageHeight),
             ),
 
             // Content
@@ -141,5 +121,33 @@ class PostCard extends StatelessWidget {
     if (diff.inDays < 7) return 'منذ ${diff.inDays} أيام';
     if (diff.inDays < 30) return 'منذ ${(diff.inDays / 7).floor()} أسابيع';
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _buildThumbnail(double imageHeight) {
+    final url = post.thumbnailUrl ?? post.thumbnail;
+    if (url == null || url.isEmpty) {
+      return Container(
+        height: imageHeight,
+        width: double.infinity,
+        color: AppColors.surfaceVariant,
+        child: const Icon(Icons.article_outlined, color: Colors.grey, size: 40),
+      );
+    }
+    return CachedNetworkImage(
+      imageUrl: ApiEndpoints.mediaUrl(url),
+      height: imageHeight,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => Container(
+        height: imageHeight,
+        color: AppColors.surfaceVariant,
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      errorWidget: (_, __, ___) => Container(
+        height: imageHeight,
+        color: AppColors.surfaceVariant,
+        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+      ),
+    );
   }
 }

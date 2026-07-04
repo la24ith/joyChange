@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:joy_of_change_v3/new_app/core/utils/url_helper.dart';
 
@@ -111,7 +112,7 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
     debugPrint('🔑 Headers: $headers');
 
     final response = await http
-        .get(Uri.parse(url), headers: headers)
+        .get(Uri.parse(ApiEndpoints.mediaUrl(url)), headers: headers)
         .timeout(const Duration(seconds: 60));
 
     debugPrint('📥 Status: ${response.statusCode}');

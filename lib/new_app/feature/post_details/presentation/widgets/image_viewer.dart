@@ -9,11 +9,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 class PremiumImageViewer extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
+  final Map<String, String> headers; // ✅ جديد
 
   const PremiumImageViewer({
     super.key,
     required this.imageUrls,
     this.initialIndex = 0,
+    this.headers = const {}, // ✅ جديد
   });
 
   @override
@@ -95,6 +97,7 @@ class _PremiumImageViewerState extends State<PremiumImageViewer>
                 return PhotoViewGalleryPageOptions(
                   imageProvider: CachedNetworkImageProvider(
                     widget.imageUrls[index],
+                    headers: widget.headers.isNotEmpty ? widget.headers : null,
                   ),
                   minScale: PhotoViewComputedScale.contained,
                   maxScale: PhotoViewComputedScale.covered * 3,
