@@ -9,6 +9,9 @@ class MediaModel extends Media {
   const MediaModel({
     required super.id,
     required super.type,
+    super.sourceType = MediaSourceType.uploaded,
+    super.provider,
+    super.externalUrl,
     required super.url,
     super.fileUrl,
     required super.fileName,
@@ -25,6 +28,9 @@ class MediaModel extends Media {
     return {
       'id': id,
       'type': type.name,
+      'source_type': sourceType.name,
+      'provider': provider,
+      'external_url': externalUrl,
       'url': url,
       'file_url': fileUrl,
       'file_name': fileName,
@@ -42,6 +48,9 @@ class MediaModel extends Media {
     return Media(
       id: id,
       type: type,
+      sourceType: sourceType,
+      provider: provider,
+      externalUrl: externalUrl,
       url: url,
       fileUrl: fileUrl,
       fileName: fileName,
@@ -56,7 +65,7 @@ class MediaModel extends Media {
   }
 
   factory MediaModel.fromJson(Map<String, dynamic> json) {
-    final typeString = json['type'] as String;
+    final typeString = json['type'] as String? ?? 'image';
     MediaType type;
     switch (typeString) {
       case 'image':
@@ -72,15 +81,30 @@ class MediaModel extends Media {
         type = MediaType.image;
     }
 
-    // الحصول على الرابط الأصلي
-    final rawUrl = json['url'] as String? ?? json['file_url'] as String?;
+    // ✅ جديد: source_type - القيمة الافتراضية "uploaded" لأي رد قديم
+    // لا يحتوي على هذا الحقل (توافقية خلفية)
+    final sourceTypeString = json['source_type'] as String? ?? 'uploaded';
+    final sourceType = sourceTypeString == 'external'
+        ? MediaSourceType.external
+        : MediaSourceType.uploaded;
 
-    // ✅ تحويل الرابط إلى HTTPS وإضافة ngrok
+    final provider = json['provider'] as String?;
+    final externalUrl = json['external_url'] as String?;
+
+    // ✅ العناصر الخارجية ترجع url/file_url = null، فلازم نتفادى الـ (!)
+    // القديم كان يعمل crash هنا: `rawUrl!`
+    final rawUrl = (json['url'] as String?) ??
+        (json['file_url'] as String?) ??
+        externalUrl ??
+        '';
 
     return MediaModel(
       id: json['id'] as int,
       type: type,
-      url: rawUrl!,
+      sourceType: sourceType,
+      provider: provider,
+      externalUrl: externalUrl,
+      url: rawUrl,
       fileUrl: (json['file_url'] as String?),
       fileName: json['file_name'] as String? ?? '',
       fileSize: json['file_size'] as int? ?? 0,

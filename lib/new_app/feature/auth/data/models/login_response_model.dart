@@ -69,28 +69,30 @@ class LoginResponseModel extends Equatable {
     }
 
     // Handle error cases based on code
+    // ✅ نستخدم دائماً رسائل عربية ثابتة لكل حالة معروفة، ولا نعتمد على
+    // نص الرسالة القادم من السيرفر لأنه قد يصل بالإنجليزية أو بصياغة تقنية.
     switch (code) {
       case 'NEEDS_SUBSCRIPTION':
         return PendingSubscription(
-          message: message ?? 'بانتظار تفعيل الاشتراك',
+          message: 'تم إنشاء حسابك بنجاح، بانتظار تفعيل الاشتراك',
           email: email ?? '',
           userId: userId ?? 0,
         );
 
       case 'SUBSCRIPTION_INACTIVE':
-        return SubscriptionInactive(
-          message: message ?? 'اشتراكك منهي او غير مفعل... راجع المدير',
+        return const SubscriptionInactive(
+          message: 'اشتراكك منتهٍ أو غير مفعل، يرجى التواصل مع الإدارة',
         );
 
       case 'UNAPPROVED_DEVICE':
         return PendingDeviceApproval(
-          message: message ?? 'بانتظار تفعيل جهازك',
+          message: 'الجهاز بحاجة لتفعيل من الإدارة',
           email: email ?? '',
         );
 
       default:
-        return InvalidCredentials(
-          message: message ?? 'خطأ في كلمة السر او الايميل',
+        return const InvalidCredentials(
+          message: 'خطأ في كلمة السر أو البريد الإلكتروني',
         );
     }
   }

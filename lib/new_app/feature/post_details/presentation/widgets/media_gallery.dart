@@ -12,7 +12,7 @@ import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widge
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/drive_preview_widget.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/external_link_card.dart';
 import 'package:visibility_detector/visibility_detector.dart';
-import '../../domain/entities/media.dart';
+import '../../domain/entities/media.dart' hide MediaSourceType;
 import 'package:joy_of_change_v3/new_app/core/constant/api_endpoints.dart';
 
 class PremiumMediaGallery extends StatefulWidget {
@@ -92,19 +92,34 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
     _indicatorController.forward(from: 0.0);
   }
 
+  // ✅ يبني الرابط العام الصحيح لكل صورة:
+  // - صورة مرفوعة على السيرفر: نفس التطبيع القديم (https + ApiEndpoints.mediaUrl)
+  // - صورة خارجية (source_type == external): نستخدم external_url كما هو،
+  //   بدون تمريره على ApiEndpoints.mediaUrl لأنه مش رابط تخزين داخلي
+  String _publicImageUrl(Media m) {
+    if (m.isExternal) {
+      return m.resolvedUrl.replaceFirst('http://', 'https://');
+    }
+    return ApiEndpoints.mediaUrl(m.url);
+  }
+
   // استبدل التوقيع والجسم الحاليين
   void _showImageViewer(List<Media> media, int initialIndex) {
     final imageMedia = media.where((m) => m.type == MediaType.image).toList();
     if (imageMedia.isEmpty) return;
 
-    // ✅ نفس التطبيع المستخدم فعليًا في الكاروسيل (https + Google Drive)
-    final imageUrls =
-        imageMedia.map((m) => ApiEndpoints.mediaUrl(m.url)).toList();
+    final imageUrls = imageMedia.map(_publicImageUrl).toList();
 
     final clickedMedia = media[initialIndex];
     final imageIndex = imageMedia.indexWhere((m) => m.id == clickedMedia.id);
 
     if (imageIndex == -1) return;
+
+    // ✅ لا نرسل هيدرز المصادقة (Authorization) لو فيه أي صورة خارجية ضمن
+    // المجموعة، لأن PremiumImageViewer بياخد مجموعة هيدرز واحدة لكل الصور،
+    // وإرسال التوكن الخاص بالتطبيق لسيرفر خارجي تسريب أمني غير مقبول.
+    final hasExternalImage = imageMedia.any((m) => m.isExternal);
+    final viewerHeaders = hasExternalImage ? <String, String>{} : _headers;
 
     Navigator.push(
       context,
@@ -114,7 +129,7 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
         pageBuilder: (_, __, ___) => PremiumImageViewer(
           imageUrls: imageUrls,
           initialIndex: imageIndex,
-          headers: _headers, // ✅ تمرير نفس هيدرز المصادقة المستخدمة في الجاليري
+          headers: viewerHeaders,
         ),
       ),
     );
@@ -124,6 +139,14 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
   // ✅ الآن يحدد أولاً مصدر الرابط (يوتيوب / غوغل درايف / منصة أخرى / رابط مباشر)
   // قبل أن يقرر أي ويدجت يستخدم لعرضه
   Widget _buildMediaWidget(Media media) {
+    // ✅ جديد: السيرفر بقى يرسل source_type/provider صراحة. لو العنصر خارجي
+    // (source_type == "external") نعتمد على القيمة دي مباشرة بدل تخمين
+    // النوع من الرابط، لأن media.url/file_url بيرجعوا null في هذه الحالة
+    // (والتخمين القديم كان هيفشل أو يعمل crash).
+    if (media.isExternal) {
+      return _buildExternalMediaWidget(media);
+    }
+
     var secureUrl = media.url;
     secureUrl = secureUrl.replaceFirst(
       'http://',
@@ -190,6 +213,65 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
           case MediaType.audio:
             return PremiumAudioPlayer(
                 audioUrl: secureUrl, title: media.fileName);
+        }
+    }
+  }
+
+  // ✅ جديد: عرض العناصر الخارجية (source_type == "external") بالاعتماد على
+  // حقل provider القادم من الباك-إند بدل تخمين النوع من الرابط.
+  Widget _buildExternalMediaWidget(Media media) {
+    final rawUrl = media.resolvedUrl;
+
+    if (rawUrl.isEmpty) {
+      return Container(
+        color: Colors.grey[200],
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('رابط خارجي غير متوفر'),
+          ),
+        ),
+      );
+    }
+
+    final secureUrl = rawUrl.replaceFirst('http://', 'https://');
+
+    switch (media.provider) {
+      case 'youtube':
+        return YoutubeEmbedPlayer(videoUrl: secureUrl);
+
+      case 'google_drive':
+      case 'drive':
+        return GoogleDrivePreview(driveUrl: secureUrl);
+
+      default:
+        // ✅ provider غير معروف أو لم يُرسله الباك-إند بعد لهذا العنصر:
+        // نستخدم أداة الاكتشاف القديمة كخط دفاع ثانٍ بدل الافتراض المباشر
+        // إن كل رابط خارجي مجهول = ExternalLinkCard.
+        final detected = MediaSourceHelper.detect(secureUrl, media.type);
+        switch (detected) {
+          case MediaSourceType.youtube:
+            return YoutubeEmbedPlayer(videoUrl: secureUrl);
+          case MediaSourceType.googleDriveVideo:
+          case MediaSourceType.googleDriveGeneric:
+            return GoogleDrivePreview(driveUrl: secureUrl);
+          case MediaSourceType.googleDriveImage:
+            return CachedNetworkImage(
+              imageUrl: secureUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              placeholder: (_, __) => Container(
+                color: Colors.grey[200],
+                child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+              errorWidget: (_, __, ___) => Container(
+                color: Colors.grey[200],
+                child: const Icon(Icons.broken_image, size: 48),
+              ),
+            );
+          default:
+            return ExternalLinkCard(url: secureUrl, title: media.fileName);
         }
     }
   }
