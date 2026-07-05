@@ -29,7 +29,7 @@ class ApiEndpoints {
   static const String categories = '/api/categories';
   static const String media = '/api/posts';
 
-// Weight Tracking Endpoints
+  // Weight Tracking Endpoints
   static const String weights = '/api/weights';
   static const String weightStats = '/api/weights/stats';
   static const String weightChart = '/api/weights/chart-data';
@@ -53,7 +53,9 @@ class ApiEndpoints {
     // تنظيف المسار
     String cleanPath = path;
     cleanPath = cleanPath.replaceAll(
-        RegExp(r'^(/storage/|storage/|/public/|public/)'), '');
+      RegExp(r'^(/storage/|storage/|/public/|public/)'),
+      '',
+    );
 
     // بناء الرابط النهائي
     return '$cleanBase/storage/$cleanPath';
@@ -71,7 +73,8 @@ class ApiEndpoints {
     final uri = Uri.tryParse(url);
     if (uri == null) return url;
 
-    final isGoogleDrive = uri.host.contains('drive.google.com') ||
+    final isGoogleDrive =
+        uri.host.contains('drive.google.com') ||
         uri.host.contains('docs.google.com');
 
     if (isGoogleDrive) {

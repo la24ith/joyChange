@@ -343,12 +343,18 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
                 ),
                 itemBuilder: (context, index, realIndex) {
                   final mediaItem = _sortedMedia[index];
+                  // ✅ لا نسجّل onTap إلا للصور فقط. لو سيبناه شغال دايمًا
+                  // (حتى لو جسمه بيتشيك على النوع جوه)، فلاتر بيعمل
+                  // TapGestureRecognizer يكسب في الـ gesture arena ويمنع
+                  // اللمسة من الوصول لـ WebViewWidget (Platform View حقيقي
+                  // بتاع GoogleDrivePreview)، فزرار التشغيل جوه الفيديو
+                  // مايضغطش خالص. onTap = null يمنع تسجيل الـ recognizer أصلاً.
+                  final onTap = mediaItem.type == MediaType.image
+                      ? () => _showImageViewer(_sortedMedia, index)
+                      : null;
+
                   return GestureDetector(
-                    onTap: () {
-                      if (mediaItem.type == MediaType.image) {
-                        _showImageViewer(_sortedMedia, index);
-                      }
-                    },
+                    onTap: onTap,
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
