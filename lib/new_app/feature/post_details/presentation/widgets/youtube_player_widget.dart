@@ -14,6 +14,7 @@
 // Android: minSdkVersion 20 | iOS: 11+ (Swift, Xcode >= 11)
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../../../core/utils/media_source_helper.dart';
 
@@ -59,18 +60,42 @@ class _YoutubeEmbedPlayerState extends State<YoutubeEmbedPlayer> {
     super.dispose();
   }
 
+  Future<void> _openExternally() async {
+    final uri = Uri.tryParse(widget.videoUrl);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_invalidUrl || _controller == null) {
       return Container(
         color: Colors.black,
-        child: const Center(
+        child: Center(
           child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'تعذر تحميل فيديو يوتيوب، الرابط غير صالح',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'تعذر تحميل فيديو يوتيوب، الرابط غير صالح',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                // ✅ حل احتياطي: يفتح الرابط في تطبيق/متصفح يوتيوب مباشرة
+                OutlinedButton.icon(
+                  onPressed: _openExternally,
+                  icon: const Icon(Icons.open_in_new, color: Colors.white),
+                  label: const Text('فتح الرابط خارجيًا',
+                      style: TextStyle(color: Colors.white)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white54),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

@@ -2,6 +2,7 @@
 
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/storage/secure_storage.dart';
@@ -82,6 +83,7 @@ class _PremiumVideoPlayerState extends State<PremiumVideoPlayer>
         errorBuilder: (context, errorMessage) => _ErrorPlaceholder(
           message: errorMessage,
           onRetry: _initializeVideo,
+          externalUrl: widget.videoUrl,
         ),
       );
 
@@ -142,6 +144,7 @@ class _PremiumVideoPlayerState extends State<PremiumVideoPlayer>
       return _ErrorPlaceholder(
         message: _errorMessage!,
         onRetry: _initializeVideo,
+        externalUrl: widget.videoUrl,
       );
     }
 
@@ -166,8 +169,26 @@ class _PremiumVideoPlayerState extends State<PremiumVideoPlayer>
 class _ErrorPlaceholder extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
+  final String? externalUrl;
 
-  const _ErrorPlaceholder({required this.message, required this.onRetry});
+  const _ErrorPlaceholder({
+    required this.message,
+    required this.onRetry,
+    this.externalUrl,
+  });
+
+  Future<void> _openExternally() async {
+    final url = externalUrl;
+    if (url == null || url.isEmpty) return;
+
+    final secureUrl = url.replaceFirst('http://', 'https://');
+    final uri = Uri.tryParse(ApiEndpoints.mediaUrl(secureUrl));
+    if (uri == null) return;
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -182,11 +203,30 @@ class _ErrorPlaceholder extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message, style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة المحاولة'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                ),
+                // ✅ حل احتياطي دايمًا: لو المشغل الداخلي فشل (صيغة غير
+                // مدعومة، رابط منتهي، مشكلة شبكة...) نديله فرصة يفتح
+                // الرابط في متصفح/تطبيق خارجي بدل ما يقف عالق.
+                if (externalUrl != null && externalUrl!.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: _openExternally,
+                    icon: const Icon(Icons.open_in_new, color: Colors.white),
+                    label: const Text('فتح الرابط خارجيًا',
+                        style: TextStyle(color: Colors.white)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white54),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
