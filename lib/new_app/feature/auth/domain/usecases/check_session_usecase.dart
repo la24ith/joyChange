@@ -3,8 +3,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/app_theme.dart';
 import 'package:joy_of_change_v3/new_app/core/errors/failure.dart';
-import 'package:joy_of_change_v3/new_app/core/di/service_locator.dart';
-import 'package:joy_of_change_v3/new_app/core/storage/secure_storage.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/entities/user.dart';
 import 'package:joy_of_change_v3/new_app/feature/auth/domain/repositories/auth_repository.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -128,25 +126,13 @@ class CheckSessionUseCase {
   /// ✅ التحقق من اكتمال البروفايل من التخزين المحلي
   Future<bool> _isProfileCompleteLocally(User user) async {
     try {
-      // 1. التحقق من وجود بيانات البروفايل
-      final hasData = user.currentWeight != null &&
-          user.targetWeight != null &&
-          user.height != null &&
-          user.patientSegment.isNotEmpty &&
-          user.patientSegment != 'general' &&
-          user.phone != null &&
-          user.phone!.isNotEmpty;
-
-      if (!hasData) {
-        return false;
-      }
-
-      // 2. التحقق من حالة الإكمال في SecureStorage
-      final secureStorage = getIt.get<SecureStorageService>();
-      final profileCompleted =
-          await secureStorage.read(key: 'profile_completed');
-
-      return profileCompleted == 'true';
+      // ✅ فئة المستخدم (patient_segment) وباقي بيانات البروفايل أصبحت تُدار
+      // بالكامل من لوحة تحكم الأدمن، وليس من اليوزر. لذلك لم يعد صحيحاً
+      // اعتبار 'general' أو نقص phone/الأوزان دليلاً على "بروفايل غير مكتمل"
+      // — فالأدمن قد يختار 'general' فعلياً كفئة صحيحة لبعض المستخدمين.
+      // هذا الشرط القديم كان يمنع اكتمال البروفايل بشكل دائم لأي مستخدم
+      // كهذا، ويُعيد توجيهه لصفحة إكمال البروفايل مع كل فتح تطبيق.
+      return true;
     } catch (e) {
       print('⚠️ Error checking profile completion: $e');
       return false;

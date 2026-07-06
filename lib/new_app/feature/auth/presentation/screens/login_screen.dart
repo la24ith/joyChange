@@ -391,38 +391,26 @@ class _LoginScreenState extends State<LoginScreen> {
               deviceId: deviceId,
             ),
           );
-
-
     }
   }
 
-  /// ✅ التحقق من اكتمال البروفايل والتنقل المناسب
+  /// ✅ التنقل بعد تسجيل الدخول
+  /// فئة المستخدم (patient_segment) وباقي بيانات البروفايل أصبحت تُدار بالكامل
+  /// من لوحة تحكم الأدمن، لذلك لم نعد نحتاج للتحقق من اكتمالها هنا —
+  /// ما دام تسجيل الدخول نجح، ننتقل مباشرة إلى الشاشة الرئيسية.
   Future<void> _checkProfileCompletionAndNavigate(User user) async {
     try {
       final secureStorage = getIt.get<SecureStorageService>();
-      final profileCompleted =
-          await secureStorage.read(key: 'profile_completed');
-
-      // ✅ التحقق من اكتمال البيانات أيضاً
-      final hasCompleteData = user.currentWeight != null &&
-          user.targetWeight != null &&
-          user.height != null &&
-          user.patientSegment.isNotEmpty &&
-          user.patientSegment != 'general' &&
-          user.phone != null &&
-          user.phone!.isNotEmpty;
-
-      // ✅ إذا كان البروفايل مكتملاً أو البيانات موجودة
-      if (profileCompleted == 'true' && hasCompleteData) {
-        Get.offAll(() => const NavigationScreen());
-      } else {
-        // ✅ إذا لم يكتمل البروفايل بعد
-        Get.offAll(() => const ProfileSetupScreen());
+      final current = await secureStorage.read(key: 'profile_completed');
+      if (current != 'true') {
+        await secureStorage.write(key: 'profile_completed', value: 'true');
       }
+      Get.offAll(() => const NavigationScreen());
     } catch (e) {
-      print('⚠️ Error checking profile completion: $e');
-      // في حالة الخطأ، ننتقل إلى ProfileSetupScreen كإجراء آمن
-      Get.offAll(() => const ProfileSetupScreen());
+      print('⚠️ Error in post-login navigation: $e');
+      // ✅ حتى في حالة الخطأ، ننتقل للرئيسية بدل حجب المستخدم خلف بروفايل
+      // لم يعد له داعٍ
+      Get.offAll(() => const NavigationScreen());
     }
   }
 

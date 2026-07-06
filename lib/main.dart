@@ -109,6 +109,12 @@ void main() async {
 // ============================================================================
 
 Future<void> _fixProfileStatus() async {
+  // ✅ فئة المستخدم (patient_segment) وباقي بيانات البروفايل أصبحت تُحدَّد
+  // بالكامل من لوحة تحكم الأدمن، وليس من اليوزر. لذلك لم يعد صحيحاً اعتبار
+  // 'general' أو نقص أحد الحقول دليلاً على "بروفايل غير مكتمل" — فالأدمن
+  // قد يختار 'general' فعلياً كفئة صحيحة لبعض المستخدمين، وهذا كان يتسبب
+  // بإعادة تعيين profile_completed إلى 'false' في كل مرة يُفتح فيها التطبيق،
+  // مما يُظهر صفحة إكمال البروفايل بشكل متكرر عند بعض الزبائن.
   try {
     final secureStorage = getIt.get<SecureStorageService>();
     final authRepo = getIt.get<AuthRepository>();
@@ -118,29 +124,10 @@ Future<void> _fixProfileStatus() async {
     if (user != null) {
       debugPrint('👤 Found user: ${user.email}');
 
-      final hasCompleteData = user.currentWeight != null &&
-          user.targetWeight != null &&
-          user.height != null &&
-          user.patientSegment.isNotEmpty &&
-          user.patientSegment != 'general' &&
-          user.phone != null &&
-          user.phone!.isNotEmpty;
-
-      debugPrint('📊 Has complete data: $hasCompleteData');
-
-      if (hasCompleteData) {
-        final current = await secureStorage.read(key: 'profile_completed');
-        debugPrint('🔍 Current profile_completed: "$current"');
-
-        if (current != 'true') {
-          await secureStorage.write(key: 'profile_completed', value: 'true');
-          debugPrint('✅ Auto-fixed profile status for: ${user.email}');
-        } else {
-          debugPrint('✅ Profile status already correct');
-        }
-      } else {
-        debugPrint('⚠️ User data incomplete, profile setup needed');
-        await secureStorage.write(key: 'profile_completed', value: 'false');
+      final current = await secureStorage.read(key: 'profile_completed');
+      if (current != 'true') {
+        await secureStorage.write(key: 'profile_completed', value: 'true');
+        debugPrint('✅ Profile marked as completed (managed by admin now)');
       }
     } else {
       debugPrint('⚠️ No user found in storage');
@@ -503,24 +490,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<bool> _isProfileComplete(User user) async {
-    try {
-      final secureStorage = getIt.get<SecureStorageService>();
-      final profileCompleted =
-          await secureStorage.read(key: 'profile_completed');
-
-      final hasCompleteData = user.currentWeight != null &&
-          user.targetWeight != null &&
-          user.height != null &&
-          user.patientSegment.isNotEmpty &&
-          user.patientSegment != 'general' &&
-          user.phone != null &&
-          user.phone!.isNotEmpty;
-
-      return profileCompleted == 'true' && hasCompleteData;
-    } catch (e) {
-      debugPrint('⚠️ Error checking profile completion: $e');
-      return false;
-    }
+    // ✅ لم يعد البروفايل يُكمَّل من اليوزر — كل بياناته (بما فيها فئة
+    // المستخدم) تُدار من الأدمن. طالما الجلسة مصادَق عليها فالبروفايل
+    // يُعتبر مكتملاً دائماً، ولا داعي للتحقق من patientSegment/phone/الخ.
+    return true;
   }
 
   void _navigateToLogin() {

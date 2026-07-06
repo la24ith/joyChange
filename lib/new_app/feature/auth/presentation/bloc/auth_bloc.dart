@@ -127,33 +127,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final token = await _authRepository.getStoredToken();
 
       if (user != null && token != null && token.isNotEmpty) {
-        final secureStorage = getIt.get<SecureStorageService>();
-        final profileCompleted =
-            await secureStorage.read(key: 'profile_completed');
-
-        print('🔍 _emitCachedState - profile_completed: "$profileCompleted"');
-
-        final hasCompleteData = user.currentWeight != null &&
-            user.targetWeight != null &&
-            user.height != null &&
-            user.patientSegment.isNotEmpty &&
-            user.patientSegment != 'general' &&
-            user.phone != null &&
-            user.phone!.isNotEmpty;
-
-        print('🔍 _emitCachedState - hasCompleteData: $hasCompleteData');
-
-        if (profileCompleted == 'true' && hasCompleteData) {
-          emit(Authenticated(
-            user: user,
-            token: token,
-          ));
-        } else {
-          emit(ProfileIncomplete(
-            user: user,
-            message: 'يرجى إكمال ملفك الشخصي',
-          ));
-        }
+        // ✅ فئة المستخدم وبيانات البروفايل (patient_segment/phone/الأوزان)
+        // أصبحت تُدار بالكامل من الأدمن. لم يعد صحيحاً اعتبار 'general'
+        // أو نقص أحد هذه الحقول دليلاً على "بروفايل غير مكتمل"، لأن الأدمن
+        // قد يختار 'general' فعلياً كفئة صحيحة. كان هذا الشرط يعيد توجيه
+        // بعض الزبائن إلى صفحة إكمال البروفايل بشكل متكرر رغم أنهم مصادَق
+        // عليهم بنجاح.
+        emit(Authenticated(
+          user: user,
+          token: token,
+        ));
       } else {
         emit(const Unauthenticated());
       }
