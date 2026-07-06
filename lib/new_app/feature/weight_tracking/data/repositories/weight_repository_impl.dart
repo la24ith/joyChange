@@ -253,4 +253,41 @@ class WeightRepositoryImpl implements WeightRepository {
       ));
     }
   }
+
+  // ==================== GOAL CELEBRATION FLAG ====================
+  // ✅ إصلاح: يمنع تكرار شاشة "🎉 وصلت لوزنك المثالي" مع كل تحديث بيانات
+  @override
+  Future<Either<Failure, bool>> hasShownGoalCelebration() async {
+    try {
+      return Right(localDataSource.hasShownGoalCelebration);
+    } catch (e) {
+      return Left(UnknownFailure(
+        message: 'Failed to read celebration flag: ${e.toString()}',
+      ));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> markGoalCelebrationShown() async {
+    try {
+      await localDataSource.markGoalCelebrationShown();
+      return const Right(null);
+    } catch (e) {
+      return Left(UnknownFailure(
+        message: 'Failed to mark celebration shown: ${e.toString()}',
+      ));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> resetGoalCelebrationFlag() async {
+    try {
+      await localDataSource.resetGoalCelebrationFlag();
+      return const Right(null);
+    } catch (e) {
+      return Left(UnknownFailure(
+        message: 'Failed to reset celebration flag: ${e.toString()}',
+      ));
+    }
+  }
 }

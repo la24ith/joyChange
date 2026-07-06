@@ -158,6 +158,33 @@ class WeightLocalDataSource {
         _prefs.containsKey(_statusKey);
   }
 
+  // ==================== GOAL CELEBRATION FLAG ====================
+  // ✅ إصلاح: علم دائم يمنع تكرار شاشة الاحتفال بالوزن المثالي
+  // في كل مرة تُحمَّل فيها البيانات (كان المصدر الرئيسي للمشكلة).
+  static const String _goalCelebrationShownKey =
+      'weight_goal_celebration_shown';
+
+  Future<void> markGoalCelebrationShown() async {
+    try {
+      await _prefs.setBool(_goalCelebrationShownKey, true);
+    } catch (e) {
+      print('Error marking goal celebration as shown: $e');
+    }
+  }
+
+  bool get hasShownGoalCelebration =>
+      _prefs.getBool(_goalCelebrationShownKey) ?? false;
+
+  /// يُستدعى عند فقدان المستخدم لحالة "تحقيق الهدف" (مثلاً بعد زيادة الوزن)
+  /// حتى يُحتفى به مجدداً في المرة القادمة التي يحقق فيها هدفه.
+  Future<void> resetGoalCelebrationFlag() async {
+    try {
+      await _prefs.remove(_goalCelebrationShownKey);
+    } catch (e) {
+      print('Error resetting goal celebration flag: $e');
+    }
+  }
+
   Future<void> setETag(String etag) async {
     try {
       await _prefs.setString(_etagKey, etag);

@@ -56,12 +56,46 @@ class FcmService {
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('FCM Foreground message: ${message.data}');
 
-    final title =
-        message.notification?.title ?? message.data['title'] ?? 'إشعار جديد';
-    final body = message.notification?.body ?? message.data['message'] ?? '';
+    // ✅ إصلاح: نقرأ العنوان والجسم كنص "خام" أولاً بدون قيمة افتراضية،
+    //    حتى نقدر نميّز فعلياً بين "موجود وفاضي" و"غير موجود إطلاقاً"
+    final rawTitle = (message.notification?.title ?? message.data['title'])
+        ?.toString()
+        .trim();
+    final rawBody = (message.notification?.body ?? message.data['message'])
+        ?.toString()
+        .trim();
+
+    // ✅ إصلاح: لو العنوان والجسم كلاهما فاضي/غير موجود، تجاهل الرسالة تماماً
+    //    بدل عرض إشعار فاضٍ للمستخدم بعنوان افتراضي "إشعار جديد"
+    final hasContent =
+        (rawTitle != null && rawTitle.isNotEmpty) ||
+            (rawBody != null && rawBody.isNotEmpty);
+
+    if (!hasContent) {
+      debugPrint(
+        '⚠️ Ignored empty FCM foreground payload (no title/message): '
+        '${message.data}',
+      );
+      return;
+    }
+
+    final title = (rawTitle != null && rawTitle.isNotEmpty)
+        ? rawTitle
+        : 'إشعار جديد';
+    final body = rawBody ?? '';
+
+    // ✅ إصلاح: تنبيه واضح لو وصل الإشعار بدون notification_id
+    //    (كان يولّد id عشوائي من الوقت، ما يعرّض الإشعارات لتصادم صامت)
+    final rawId = message.data['notification_id']?.toString();
+    if (rawId == null || rawId.isEmpty) {
+      debugPrint(
+        '⚠️ FCM payload missing notification_id, generating fallback id. '
+        'data: ${message.data}',
+      );
+    }
 
     final notificationId =
-        int.tryParse(message.data['notification_id']?.toString() ?? '') ??
+        int.tryParse(rawId ?? '') ??
             DateTime.now().millisecondsSinceEpoch.remainder(100000);
 
     try {

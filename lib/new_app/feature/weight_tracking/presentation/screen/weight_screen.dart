@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../domain/usecases/get_cache_info_usecase.dart';
 import '../bloc/weight_bloc.dart';
 import '../bloc/weight_event.dart';
 import '../bloc/weight_state.dart';
@@ -80,13 +81,6 @@ class _WeightViewState extends State<_WeightView> {
           tooltip: 'تحديث البيانات',
         ),
         // زر معلومات الكاش (للمطورين)
-        IconButton(
-          icon: const Icon(Icons.info_outline),
-          onPressed: () {
-            _showCacheInfo(context);
-          },
-          tooltip: 'معلومات التخزين المؤقت',
-        ),
       ],
     );
   }
@@ -263,47 +257,6 @@ class _WeightViewState extends State<_WeightView> {
   }
 
   // ==================== CACHE INFO DIALOG ====================
-  void _showCacheInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('معلومات التخزين المؤقت'),
-        content: FutureBuilder(
-          future: _getCacheInfo(),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final info = snapshot.data!;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow('الحالة', info['status']!),
-                  _buildInfoRow('آخر تحديث', info['lastUpdate']!),
-                  _buildInfoRow('العمر', info['age']!),
-                  _buildInfoRow('حجم الكاش', info['size']!),
-                  _buildInfoRow('عدد العناصر', info['entries']!),
-                ],
-              );
-            }
-            return const CircularProgressIndicator();
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              context.read<WeightBloc>().add(ClearCacheEvent());
-              Navigator.pop(context);
-            },
-            child: const Text('مسح الكاش'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
@@ -316,16 +269,5 @@ class _WeightViewState extends State<_WeightView> {
         ],
       ),
     );
-  }
-
-  Future<Map<String, String>> _getCacheInfo() async {
-    // يمكن جلب معلومات الكاش من الـ Repository
-    return {
-      'status': 'صالح',
-      'lastUpdate': 'منذ 5 دقائق',
-      'age': '5 دقائق',
-      'size': '2.3 KB',
-      'entries': '15 قياس',
-    };
   }
 }

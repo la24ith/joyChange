@@ -33,7 +33,10 @@ import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/subsc
 import 'package:joy_of_change_v3/new_app/feature/auth/presentation/screens/SubscriptionInactiveScreen.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/home/presentation/bloc/home_event.dart';
-import 'package:joy_of_change_v3/new_app/feature/navigation/ideal_weight_splash_screen.dart';
+// ✅ إصلاح: تمت إزالة الاستيراد القديم لـ ideal_weight_splash_screen.dart
+// الذي كان يُستخدم مع home: التفاعلي المُشكِل. الآن نستخدم IdealWeightPage
+// الحقيقية عبر تنقّل لمرة واحدة فقط (انظر builder أدناه).
+import 'package:joy_of_change_v3/new_app/feature/weight_tracking/domain/repositories/weight_repository.dart';
 import 'package:joy_of_change_v3/new_app/feature/navigation/navigation_screen.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/NotificationHiveModelAdapter.dart';
 import 'package:joy_of_change_v3/new_app/feature/notifications/data/models/notification_hive_model.dart';
@@ -46,6 +49,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:joy_of_change_v3/new_app/feature/weight_tracking/presentation/screen/ideal_weight_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:joy_of_change_v3/new_app/core/services/fcm_service.dart';
 
@@ -224,7 +228,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ),
       ],
       child: GetMaterialApp(
-        title: 'متتبع وزن المريض',
+        title: ' متعة التغير ',
         debugShowCheckedModeBanner: false,
         // ✅ دعم اللغة العربية والاتجاه من اليمين لليسار
         locale: const Locale('ar', 'SA'),
@@ -237,10 +241,59 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        // ✅ إصلاح جذري: كان `home:` مربوطاً بـ BlocBuilder على WeightBloc،
+        // فيعيد بناء الشاشة الجذرية بالكامل (يستبدل كل مكدس التنقّل) في كل
+        // مرة يصدر فيها WeightBloc حالة WeightLoaded بها goalStatus.reached
+        // == true. هذا كان يحدث بشكل متكرر: عند أول تحميل، عند كل سحب
+        // للتحديث، عند إضافة وزن جديد، وحتى تلقائياً كل ساعة (auto-refresh
+        // timer في WeightBloc) — أي أن المستخدم الذي حقق هدفه كان يُقذف
+        // إلى شاشة الاحتفال من جديد باستمرار بغض النظر عن الشاشة التي هو
+        // فيها فعلياً (تسجيل الدخول، إكمال الملف الشخصي، الصفحة الرئيسية...)
+        // ولا توجد طريقة للرجوع لأن home: تستبدل الجذر كاملاً وليست دفعة
+        // (push) عادية.
+        //
+        // الحل: home أصبحت ثابتة (SplashScreen وحدها تقرر التنقل حسب حالة
+        // تسجيل الدخول كما كانت أصلاً)، والاحتفال بالوزن المثالي يُعرض مرة
+        // واحدة فقط عبر BlocListener عام مثبَّت في builder (يبقى حياً طوال
+        // عمر التطبيق بغض النظر عن الشاشة الحالية)، ويستخدم Navigator.push
+        // (وليس استبدال الجذر) + علماً دائماً في SharedPreferences
+        // (hasShownGoalCelebration) لمنع التكرار.
         builder: (context, child) {
           return Directionality(
             textDirection: TextDirection.rtl,
-            child: child!,
+            child: BlocListener<WeightBloc, WeightState>(
+              listenWhen: (previous, current) {
+                final wasReached =
+                    previous is WeightLoaded && previous.goalStatus.reached;
+                final isReached =
+                    current is WeightLoaded && current.goalStatus.reached;
+                // فقط عند الانتقال الفعلي من "لم يتحقق الهدف" إلى "تحقق"
+                return !wasReached && isReached;
+              },
+              listener: (context, state) async {
+                final repository = getIt<WeightRepository>();
+                final alreadyShownResult =
+                    await repository.hasShownGoalCelebration();
+                final alreadyShown =
+                    alreadyShownResult.fold((_) => false, (v) => v);
+
+                if (!alreadyShown) {
+                  await repository.markGoalCelebrationShown();
+                  final navigator = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  );
+                  navigator.push(
+                    MaterialPageRoute(
+                      builder: (_) => const IdealWeightPage(
+                        isSplashMode: true,
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: child!,
+            ),
           );
         },
         theme: ThemeData(
@@ -249,14 +302,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           fontFamily: 'Cairo',
           scaffoldBackgroundColor: Colors.grey[50],
         ),
-        home: BlocBuilder<WeightBloc, WeightState>(
-          builder: (context, state) {
-            if (state is WeightLoaded && state.goalStatus.reached) {
-              return const IdealWeightSplashScreen();
-            }
-            return const SplashScreen();
-          },
-        ),
+        home: const SplashScreen(),
         getPages: [
           GetPage(name: '/login', page: () => const LoginScreen()),
           GetPage(name: '/home', page: () => const NavigationScreen()),

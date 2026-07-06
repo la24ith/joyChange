@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:joy_of_change_v3/new_app/feature/weight_tracking/domain/usecases/clear_cache_usecase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:joy_of_change_v3/new_app/core/constant/storage_keys.dart';
 import 'package:joy_of_change_v3/new_app/core/services/notification_sync_service.dart';
@@ -380,6 +381,9 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<AddWeightUseCase>(
     () => AddWeightUseCase(getIt<WeightRepository>()),
   );
+  getIt.registerLazySingleton<ClearCacheUseCase>(
+    () => ClearCacheUseCase(getIt<WeightRepository>()),
+  );
 
   getIt.registerFactory<WeightBloc>(
     () => WeightBloc(
@@ -388,6 +392,8 @@ Future<void> setupServiceLocator() async {
       getWeightChartUseCase: getIt<GetWeightChartUseCase>(),
       getIdealWeightStatusUseCase: getIt<GetIdealWeightStatusUseCase>(),
       addWeightUseCase: getIt<AddWeightUseCase>(),
+      clearCacheUseCase: getIt<ClearCacheUseCase>(),
+      repository: getIt<WeightRepository>(),
     ),
   );
   debugPrint('✅ Weight Tracking feature registered');

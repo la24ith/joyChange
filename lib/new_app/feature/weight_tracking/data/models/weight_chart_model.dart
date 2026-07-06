@@ -104,7 +104,9 @@ class WeightChartModel extends Equatable {
   }
 
   WeightChartModel getSimplified(int maxPoints) {
-    if (series.length <= maxPoints) return this;
+    // ✅ إصلاح: maxPoints <= 0 كان يسبب قسمة على صفر (Infinity/NaN) في
+    // (series.length / maxPoints).ceil() أدناه.
+    if (maxPoints <= 0 || series.length <= maxPoints) return this;
     final step = (series.length / maxPoints).ceil();
     final newLabels = <DateTime>[];
     final newSeries = <double>[];

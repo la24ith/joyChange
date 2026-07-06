@@ -3,7 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:joy_of_change_v3/new_app/feature/weight_tracking/domain/entities/weight_goal_status.dart';
-//import 'package:share_plus/share_plus.dart';
+// ✅ إصلاح: كان مُعلَّقاً بالكامل، ما جعل زر "مشاركة الإنجاز" بلا أي وظيفة
+import 'package:share_plus/share_plus.dart';
 import 'dart:math' as math;
 
 import '../bloc/weight_bloc.dart';
@@ -42,6 +43,20 @@ class _IdealWeightPageState extends State<IdealWeightPage>
         _confettiController.stop();
       }
     });
+
+    // ✅ إصلاح: الشاشة كانت تعرض نص "سيتم توجيهك تلقائياً خلال 5 ثواني..."
+    // في وضع isSplashMode بدون أي كود فعلي يقوم بالتوجيه — المستخدم كان
+    // يعلق في هذه الشاشة إلى الأبد. الآن يتم التوجيه فعلياً.
+    // ملاحظة: هذه الشاشة تُعرض عبر Navigator.push فوق الشاشة الحالية
+    // (انظر main.dart)، لذا فإن الرجوع الصحيح هو Navigator.pop لإعادة
+    // المستخدم إلى ما كان يفعله بالضبط، وليس فرض شاشة ثابتة معينة.
+    if (widget.isSplashMode) {
+      Future.delayed(const Duration(seconds: 5), () {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
   }
 
   @override
@@ -232,7 +247,10 @@ class _IdealWeightPageState extends State<IdealWeightPage>
                           ),
                           const SizedBox(height: 20),
                           ProgressRing(
-                            progress: 100,
+                            // ✅ إصلاح: كانت القيمة 100 ثابتة دائماً بغض
+                            // النظر عن التقدم الفعلي القادم من الـ API.
+                            progress:
+                                (goal.progressPercent ?? 100).clamp(0, 100),
                             size: 180,
                             strokeWidth: 12,
                           ),
@@ -424,7 +442,9 @@ class _IdealWeightPageState extends State<IdealWeightPage>
                             ),
                           ),
                           onPressed: () {
-                            /*       Share.share('''
+                            // ✅ إصلاح: كان الاستدعاء بالكامل معلَّقاً كتعليق
+                            // برمجي، ما جعل الزر لا يفعل شيئاً عند الضغط.
+                            Share.share('''
 🎉 وصلت إلى هدفي في الوزن!
 
 الوزن الحالي: ${goal.formattedCurrentWeight}
@@ -434,7 +454,6 @@ ${goal.idealWeight != null ? 'الوزن المثالي: ${goal.idealWeight!.toS
 أنا فخور بإنجازي في رحلة اللياقة!
 #رحلة_التغيير #الوزن_المثالي
 ''');
-                     */
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber.shade600,

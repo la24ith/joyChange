@@ -21,4 +21,9 @@ abstract class WeightRepository {
   });
   Future<Either<Failure, void>> clearCache();
   Future<Either<Failure, Map<String, dynamic>>> getCacheInfo();
+
+  // ✅ إصلاح: لمنع تكرار شاشة الاحتفال بالوزن المثالي عند كل تحديث
+  Future<Either<Failure, bool>> hasShownGoalCelebration();
+  Future<Either<Failure, void>> markGoalCelebrationShown();
+  Future<Either<Failure, void>> resetGoalCelebrationFlag();
 }

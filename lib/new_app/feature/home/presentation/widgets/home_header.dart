@@ -100,17 +100,34 @@ class HomeHeader extends StatelessWidget {
     );
   }
 
-  // ✅ حذف الإشعارات التي انتهت مدتها (expiresAt) من التخزين المحلي
-  Future<void> _purgeExpiredNotifications(
+  // ✅ إصلاح: إشعار "فاسد" هو أي إشعار وصل بدون عنوان وبدون رسالة فعليين.
+  //    نتحقق بعد trim حتى لا تنجو السجلات التي تحتوي مسافات فارغة فقط.
+  bool _isInvalidContent(NotificationHiveModel n) {
+    final title = n.title?.trim() ?? '';
+    final message = n.message?.trim() ?? '';
+    return title.isEmpty && message.isEmpty;
+  }
+
+  // ✅ إصلاح: تنظيف شامل عند فتح الشاشة الرئيسية —
+  //    1) الإشعارات المنتهية الصلاحية (كما كان سابقاً)
+  //    2) الإشعارات "الفاسدة" التي لا تحمل عنواناً ولا رسالة (سجلات قديمة
+  //       أُضيفت قبل إصلاح NotificationSyncService، أو أي مسار آخر كتب
+  //       مباشرة في Hive متجاوزاً التحقق). هذا يضمن اختفاء العناصر الفاضية
+  //       من الشارة (badge) ومن شاشة الإشعارات حتى بدون إعادة تثبيت التطبيق.
+  Future<void> _purgeExpiredAndInvalidNotifications(
     Box<NotificationHiveModel> box,
   ) async {
     final now = DateTime.now();
-    final expired = box.values.where(
-      (n) => n.expiresAt != null && n.expiresAt!.isBefore(now),
+
+    final toDelete = box.values.where(
+      (n) =>
+          (n.expiresAt != null && n.expiresAt!.isBefore(now)) ||
+          _isInvalidContent(n),
     );
 
-    for (final n in expired.toList()) {
+    for (final n in toDelete.toList()) {
       if (n.id != null) {
+        debugPrint('🧹 Purged notification (expired/invalid): id=${n.id}');
         await box.delete(n.id);
       }
     }
@@ -152,19 +169,22 @@ class HomeHeader extends StatelessWidget {
       }
     }
 
-    // ✅ حذف الإشعارات المنتهية فور فتح التطبيق (best-effort، لا يعطل الواجهة)
-    _purgeExpiredNotifications(box);
+    // ✅ حذف الإشعارات المنتهية والفاسدة فور فتح التطبيق (best-effort، لا يعطل الواجهة)
+    _purgeExpiredAndInvalidNotifications(box);
 
     return ValueListenableBuilder(
       valueListenable: box.listenable(),
       builder: (context, Box<NotificationHiveModel> box, _) {
         final now = DateTime.now();
         // ✅ عدد الإشعارات "غير المقروءة" فقط، مع استبعاد المنتهية الصلاحية
+        //    واستبعاد أي إشعار فاسد (بدون عنوان ولا رسالة) كطبقة حماية إضافية
+        //    ريثما يكتمل التنظيف أعلاه بشكل غير متزامن (best-effort).
         final unreadCount = box.values
             .where(
               (n) =>
                   !(n.isRead ?? false) &&
-                  (n.expiresAt == null || n.expiresAt!.isAfter(now)),
+                  (n.expiresAt == null || n.expiresAt!.isAfter(now)) &&
+                  !_isInvalidContent(n),
             )
             .length;
 

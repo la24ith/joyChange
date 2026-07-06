@@ -21,6 +21,15 @@ class NotificationSyncService {
     this.local,
   );
 
+  // ✅ إصلاح: إشعار قادم من الـ API يُعتبر صالحاً للتخزين فقط إذا كان
+  //    يحمل عنوان أو رسالة فعليين. هذا يمنع تسريب سجلات فاضية إلى Hive
+  //    ومن ثم ظهورها في شاشة الإشعارات ككارد بدون محتوى.
+  bool _hasValidContent(dynamic remote) {
+    final title = (remote.title as String?)?.trim() ?? '';
+    final message = (remote.message as String?)?.trim() ?? '';
+    return title.isNotEmpty || message.isNotEmpty;
+  }
+
   Future<void> sync({bool force = false}) async {
     if (!force && _lastSyncTime != null) {
       final elapsed = DateTime.now().difference(_lastSyncTime!);
@@ -61,13 +70,27 @@ class NotificationSyncService {
         return;
       }
 
-      final remoteIds = remoteNotifications.map((e) => e.id).toSet();
+      // ✅ إصلاح: فلترة أي عنصر وصل من الـ API بدون محتوى فعلي (title/message
+      //    فاضيين) قبل أي معالجة أخرى — بدل تخزينه بصمت في Hive.
+      final validRemoteNotifications = <dynamic>[];
+      for (final remote in remoteNotifications) {
+        if (_hasValidContent(remote)) {
+          validRemoteNotifications.add(remote);
+        } else {
+          debugPrint(
+            '⚠️ Skipped invalid notification from API (empty content): '
+            'id=${remote.id}',
+          );
+        }
+      }
+
+      final remoteIds = validRemoteNotifications.map((e) => e.id).toSet();
       final localIds = localNotifications.map((e) => e.id).toSet();
 
       //------------------------------------------------------
       // NEW + UPDATE — فقط تحديث القائمة المحلية، بدون أي عرض
       //------------------------------------------------------
-      for (final remote in remoteNotifications) {
+      for (final remote in validRemoteNotifications) {
         try {
           final exists = await local.exists(remote.id);
           final hiveModel = remote.toHiveModel();
@@ -93,6 +116,9 @@ class NotificationSyncService {
 
       //------------------------------------------------------
       // DELETED
+      // ملاحظة: تُحسب هنا فقط بالنسبة للإشعارات الصالحة القادمة من
+      // السيرفر (remoteIds بعد الفلترة)، حتى لا يُحذف محلياً أي إشعار
+      // كان صالحاً سابقاً بسبب استبعاد عنصر فاسد من نفس القائمة.
       //------------------------------------------------------
       final deletedIds = localIds.difference(remoteIds);
 

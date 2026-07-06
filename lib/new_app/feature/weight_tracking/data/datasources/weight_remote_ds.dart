@@ -101,7 +101,17 @@ class WeightRemoteDataSource {
       final response = await _dioClient.get(ApiEndpoints.weightIdealStatus);
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        return WeightGoalStatus.fromJson(response.data);
+        // ✅ إصلاح: باقي الموديلات في هذا المشروع (weight_stats_model,
+        // weight_chart_model, ideal_status_model) عانت من نفس المشكلة
+        // سابقاً: الـ API يرجع { "success": true, "data": {...} } لكن كان
+        // يُمرَّر الغلاف الكامل بدل الكائن الداخلي، فتُقرأ كل الحقول
+        // كـ null/false افتراضياً. نفكّ الغلاف هنا بشكل استباقي وآمن — إن
+        // كانت WeightGoalStatus.fromJson تتوقع الكائن الداخلي مباشرة (وهذا
+        // المرجَّح) فهذا يصلح المشكلة؛ وإن كانت هي نفسها تفكّ 'data'
+        // داخلياً، فلن يتأثر شيء لأن json['data'] ستكون غير موجودة فتستخدم
+        // json نفسه (وهو نفس الكائن الداخلي أصلاً).
+        final data = response.data['data'] ?? response.data;
+        return WeightGoalStatus.fromJson(data);
       } else {
         throw ServerException(
           message: response.data['message'] ?? 'Failed to load weight status',
@@ -118,7 +128,8 @@ class WeightRemoteDataSource {
   }
 
   // ==================== ADD WEIGHT ENTRY ====================
-  Future<void> addWeightEntry(double weight, DateTime date, {String? notes}) async {
+  Future<void> addWeightEntry(double weight, DateTime date,
+      {String? notes}) async {
     try {
       final response = await _dioClient.post(
         ApiEndpoints.addWeight,
@@ -155,7 +166,7 @@ class WeightRemoteDataSource {
       ]);
 
       return {
-        'weights': results[0].data,  // نمرر الـ response كاملاً
+        'weights': results[0].data, // نمرر الـ response كاملاً
         'stats': results[1].data,
         'chart': results[2].data,
         'status': results[3].data,

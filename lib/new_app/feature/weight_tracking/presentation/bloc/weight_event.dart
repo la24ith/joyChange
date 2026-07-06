@@ -19,11 +19,9 @@ class LoadWeightsEvent extends WeightEvent {
 
 class RefreshWeightsEvent extends WeightEvent {}
 
-class FetchWeightData extends WeightEvent {
-  final bool forceRefresh;
-
-  const FetchWeightData({this.forceRefresh = false});
-}
+// ✅ إصلاح: تمت إزالة FetchWeightData — كان حدثاً معرَّفاً بلا أي هاندلر
+// مسجَّل له في WeightBloc (on<FetchWeightData> غير موجود)، ولا يملك
+// props صحيحة لـ Equatable. كود ميت بالكامل.
 
 class AddWeightEvent extends WeightEvent {
   final double weight;
@@ -42,4 +40,6 @@ class AddWeightEvent extends WeightEvent {
 
 class ClearCacheEvent extends WeightEvent {}
 
-class GetCacheInfoEvent extends WeightEvent {}
+// ✅ إصلاح: تمت إزالة GetCacheInfoEvent — كان الهاندلر الخاص به فارغاً
+// تماماً في WeightBloc. معلومات الكاش تُقرأ الآن مباشرة عبر
+// GetCacheInfoUseCase من الشاشة (انظر weight_screen.dart).
