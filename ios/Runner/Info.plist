@@ -45,5 +45,39 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- ============================================================
+	     الإضافات المطلوبة لـ iOS (بدأت هنا)
+	     ============================================================ -->
+
+	<!-- App Transport Security: الباك اند شغال HTTPS بشهادة صحيحة،
+	     فمفيش داعي للسماح باتصالات غير آمنة -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+
+	<!-- ضروري عشان الإشعارات تشتغل والتطبيق في الخلفية (FCM) -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- دعم اللغة العربية والإنجليزية -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ar</string>
+		<string>en</string>
+	</array>
+
+	<!-- يمنع سؤال التشفير اليدوي في كل رفعة على App Store Connect -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<!-- ============================================================
+	     نهاية الإضافات
+	     ============================================================ -->
+
 </dict>
 </plist>
