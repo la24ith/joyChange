@@ -88,6 +88,11 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
         });
     } catch (e) {
       debugPrint('❌ Audio init error: $e');
+      // ✅ لو فشل التشغيل بعد وجود ملف في الكاش، الأرجح إنه ناقص/تالف
+      // (مثلاً بسبب انقطاع نت أثناء تحميل سابق). نمسحه هنا حتى لا يبقى
+      // المستخدم عالقًا على نفس الخطأ للأبد؛ المحاولة القادمة (زر إعادة
+      // المحاولة) هتعيد التحميل من جديد بدل ما تعتمد على نفس الملف الفاسد.
+      await _deleteCacheFile(widget.audioUrl);
       if (mounted)
         setState(() {
           _isLoading = false;
@@ -96,37 +101,99 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
     }
   }
 
+  Future<File> _cacheFile(String url) async {
+    final dir = await getTemporaryDirectory();
+    // ✅ v2: تغيير بادئة اسم الملف يجعل أي كاش قديم من نسخة سابقة (قد
+    // يكون محفوظًا ناقصًا/تالفًا على أجهزة المستخدمين) يُتجاهل تلقائيًا
+    // ويُعاد تحميله من جديد، دون الحاجة لأي تدخل يدوي من المستخدم.
+    return File('${dir.path}/audio_v2_${url.hashCode.abs()}.mp3');
+  }
+
+  Future<void> _deleteCacheFile(String url) async {
+    try {
+      final file = await _cacheFile(url);
+      if (await file.exists()) {
+        await file.delete();
+        debugPrint('🗑️ Deleted cached audio: ${file.path}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to delete cached audio: $e');
+    }
+  }
+
   Future<String> _downloadWithAuthHeaders(String url) async {
     // ✅ Cache: إذا الملف موجود مسبقاً نرجعه مباشرة
-    final dir = await getTemporaryDirectory();
-    final cacheFile = File('${dir.path}/audio_${url.hashCode.abs()}.mp3');
+    final cacheFile = await _cacheFile(url);
 
     if (await cacheFile.exists() && await cacheFile.length() > 0) {
       debugPrint('✅ Using cached audio: ${cacheFile.path}');
       return cacheFile.path;
     }
 
-    // ✅ استخدام UrlHelper.getAuthHeaders() مباشرة — يحتوي على كل الـ headers الصحيحة
-    final headers = await UrlHelper.getAuthHeaders();
-    debugPrint('⬇️ Downloading audio...');
-    debugPrint('🔑 Headers: $headers');
+    // ✅ نكتب أولاً في ملف مؤقت .tmp، ولا نعيد تسميته لملف الكاش النهائي
+    // إلا بعد التأكد من اكتمال التحميل بنجاح. لو حصل انقطاع نت أو أي
+    // خطأ في أي لحظة أثناء التحميل، يبقى ملف الكاش النهائي غير موجود
+    // (بدل ما يبقى موجود وناقص)، فالمحاولة القادمة تعيد التحميل تلقائيًا
+    // بدل ما تعلق على نفس الملف التالف للأبد.
+    final tempFile = File('${cacheFile.path}.tmp');
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
 
-    final response = await http
-        .get(Uri.parse(ApiEndpoints.mediaUrl(url)), headers: headers)
-        .timeout(const Duration(seconds: 60));
+    try {
+      // ✅ استخدام UrlHelper.getAuthHeaders() مباشرة — يحتوي على كل الـ headers الصحيحة
+      final headers = await UrlHelper.getAuthHeaders();
+      debugPrint('⬇️ Downloading audio...');
+      debugPrint('🔑 Headers: $headers');
 
-    debugPrint('📥 Status: ${response.statusCode}');
-    debugPrint('📥 Content-Type: ${response.headers['content-type']}');
-    debugPrint('📥 Content-Length: ${response.headers['content-length']}');
+      final response = await http
+          .get(Uri.parse(ApiEndpoints.mediaUrl(url)), headers: headers)
+          // ✅ مهلة أطول (120 ثانية) لأن المقاطع تصل لحوالي 3 دقائق وقد
+          // تحتاج وقتًا أطول على شبكات ضعيفة قبل اعتبارها فشلت فعلاً
+          .timeout(const Duration(seconds: 120));
 
-    if (response.statusCode == 200) {
-      await cacheFile.writeAsBytes(response.bodyBytes);
-      debugPrint(
-          '✅ Saved: ${cacheFile.path} (${response.bodyBytes.length} bytes)');
-      return cacheFile.path;
-    } else {
-      debugPrint('❌ Response body: ${response.body}');
-      throw Exception('Download failed: HTTP ${response.statusCode}');
+      debugPrint('📥 Status: ${response.statusCode}');
+      debugPrint('📥 Content-Type: ${response.headers['content-type']}');
+      debugPrint('📥 Content-Length: ${response.headers['content-length']}');
+
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+
+        if (bytes.isEmpty) {
+          throw Exception('Downloaded audio is empty');
+        }
+
+        // ✅ تحقق من اكتمال التحميل فعليًا (وليس مجرد وصول رد بحالة 200)
+        // بمقارنة الحجم الفعلي مع content-length إن كان متوفرًا
+        final expectedLength = response.headers['content-length'];
+        if (expectedLength != null) {
+          final expected = int.tryParse(expectedLength);
+          if (expected != null && bytes.length != expected) {
+            throw Exception(
+              'Incomplete download: got ${bytes.length} of $expected bytes',
+            );
+          }
+        }
+
+        await tempFile.writeAsBytes(bytes);
+        if (await cacheFile.exists()) {
+          await cacheFile.delete();
+        }
+        await tempFile.rename(cacheFile.path);
+
+        debugPrint('✅ Saved: ${cacheFile.path} (${bytes.length} bytes)');
+        return cacheFile.path;
+      } else {
+        debugPrint('❌ Response body: ${response.body}');
+        throw Exception('Download failed: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      // ✅ تنظيف الملف المؤقت في حال فشل التحميل لأي سبب، حتى لا يتراكم
+      // على الجهاز أو يتم الخلط بينه وبين تحميل ناجح لاحقًا
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+      rethrow;
     }
   }
 
@@ -263,15 +330,15 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                         _isLoading
                             ? 'جاري التحميل...'
                             : _hasError
-                                ? 'فشل التحميل، اضغط للمحاولة'
-                                : 'بودكاست',
+                            ? 'فشل التحميل، اضغط للمحاولة'
+                            : 'بودكاست',
                         style: TextStyle(
                           fontSize: 12,
                           color: _hasError
                               ? Colors.red.shade400
                               : (isDark
-                                  ? Colors.white.withOpacity(0.6)
-                                  : Colors.black.withOpacity(0.5)),
+                                    ? Colors.white.withOpacity(0.6)
+                                    : Colors.black.withOpacity(0.5)),
                         ),
                       ),
                     ],
@@ -282,7 +349,9 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                     onTap: _changeSpeed,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark
                             ? Colors.white.withOpacity(0.1)
@@ -312,7 +381,8 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                       20,
                       (index) => Container(
                         width: 2,
-                        height: 10 +
+                        height:
+                            10 +
                             (_waveAnimationController.value * 15) *
                                 (index % 3 + 1),
                         margin: const EdgeInsets.symmetric(horizontal: 1.5),
@@ -340,9 +410,10 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
                   Expanded(
                     child: Slider(
                       value: (_duration.inSeconds > 0)
-                          ? _position.inSeconds
-                              .toDouble()
-                              .clamp(0, _duration.inSeconds.toDouble())
+                          ? _position.inSeconds.toDouble().clamp(
+                              0,
+                              _duration.inSeconds.toDouble(),
+                            )
                           : 0.0,
                       max: _duration.inSeconds > 0
                           ? _duration.inSeconds.toDouble()
