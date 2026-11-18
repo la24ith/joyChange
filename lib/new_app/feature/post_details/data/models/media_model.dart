@@ -77,6 +77,9 @@ class MediaModel extends Media {
       case 'audio':
         type = MediaType.audio;
         break;
+      case 'document':
+        type = MediaType.document;
+        break;
       default:
         type = MediaType.image;
     }

@@ -2,7 +2,7 @@
 
 import 'package:equatable/equatable.dart';
 
-enum MediaType { image, video, audio }
+enum MediaType { image, video, audio, document }
 
 // ✅ جديد: نوع مصدر الميديا
 enum MediaSourceType { uploaded, external }

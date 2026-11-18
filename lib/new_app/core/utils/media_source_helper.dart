@@ -107,7 +107,8 @@ class MediaSourceHelper {
         case MediaType.image:
           return MediaSourceType.googleDriveImage;
         case MediaType.audio:
-          // الصوت من درايف: لا يوجد ستريمنغ مباشر موثوق، نعرضه كمعاينة WebView
+        case MediaType.document:
+          // الصوت/المستند من درايف: لا يوجد ستريمنغ مباشر موثوق، نعرضه كمعاينة WebView
           return MediaSourceType.googleDriveGeneric;
       }
     }
@@ -128,6 +129,9 @@ class MediaSourceHelper {
         return MediaSourceType.directAudio;
       case MediaType.image:
         return MediaSourceType.directImage;
+      case MediaType.document:
+        // المستندات تُعرض ببطاقة DocumentCard قبل الوصول لهنا
+        return MediaSourceType.externalLink;
     }
   }
 }

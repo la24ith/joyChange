@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:joy_of_change_v3/new_app/core/utils/url_helper.dart';
 import 'package:joy_of_change_v3/new_app/core/utils/media_source_helper.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/audio_player_widget.dart';
+import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/document_card.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/image_viewer.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/video_player_widget.dart';
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/youtube_player_widget.dart';
@@ -19,10 +20,15 @@ class PremiumMediaGallery extends StatefulWidget {
   final List<Media> media;
   final double? screenWidth;
 
+  /// الصورة المصغّرة للمنشور (المعروضة أعلى الصفحة). تُستخدم فقط لتجنّب
+  /// تكرار نفس الصورة داخل المعرض.
+  final String? postThumbnail;
+
   const PremiumMediaGallery({
     super.key,
     required this.media,
     this.screenWidth,
+    this.postThumbnail,
   });
 
   @override
@@ -50,12 +56,16 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
     super.initState();
     _carouselController = CarouselSliderController();
 
-    // ✅ ترتيب الوسائط وتجاهل العنصر الأول إذا كان صورة
+    // ✅ ترتيب الوسائط وعرضها كلها (صورة + صوت + فيديو + مستند...)
     _sortedMedia = List<Media>.from(widget.media)
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    // ✅ إذا كان العنصر الأول صورة، قم بإزالته
-    if (_sortedMedia.isNotEmpty && _sortedMedia.first.type == MediaType.image) {
+    // ✅ نزيل الصورة الأولى فقط إذا كانت هي نفسها الصورة المصغّرة المعروضة
+    // أعلى الصفحة. سابقاً كانت تُزال أي صورة أولى، فمنشور فيه صورة + صوت
+    // كان يظهر فيه الصوت فقط.
+    if (_sortedMedia.isNotEmpty &&
+        _sortedMedia.first.type == MediaType.image &&
+        _isSameFile(_sortedMedia.first.url, widget.postThumbnail)) {
       _sortedMedia.removeAt(0);
     }
 
@@ -72,6 +82,19 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
 
     // ✅ تحميل headers مسبقاً
     _loadHeaders();
+  }
+
+  /// مقارنة رابطين بحسب اسم الملف فقط (الصورة المصغّرة قد تأتي كمسار
+  /// نسبي "post-media/13/x.jpg" والوسيط كرابط كامل لنفس الملف).
+  static bool _isSameFile(String url, String? other) {
+    if (other == null || other.isEmpty || url.isEmpty) return false;
+    String fileName(String value) {
+      final segments = Uri.tryParse(value)?.pathSegments ?? const <String>[];
+      return segments.isNotEmpty ? segments.last : value;
+    }
+
+    final a = fileName(url);
+    return a.isNotEmpty && a == fileName(other);
   }
 
   Future<void> _loadHeaders() async {
@@ -147,6 +170,10 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
       return _buildExternalMediaWidget(media);
     }
 
+    if (media.type == MediaType.document) {
+      return DocumentCard(media: media);
+    }
+
     var secureUrl = media.url;
     secureUrl = secureUrl.replaceFirst(
       'http://',
@@ -212,7 +239,13 @@ class _PremiumMediaGalleryState extends State<PremiumMediaGallery>
             return PremiumVideoPlayer(videoUrl: secureUrl);
           case MediaType.audio:
             return PremiumAudioPlayer(
-                audioUrl: secureUrl, title: media.fileName);
+              audioUrl: secureUrl,
+              title: media.fileName,
+              mediaId: media.id,
+              fileName: media.fileName,
+            );
+          case MediaType.document:
+            return DocumentCard(media: media);
         }
     }
   }

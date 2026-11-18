@@ -13,10 +13,18 @@ class PremiumAudioPlayer extends StatefulWidget {
   final String audioUrl;
   final String title;
 
+  /// معرّف عنصر media واسم الملف الأصلي، يُستخدمان لتسمية الملف المؤقت
+  /// (post_media_{id}.{ext}). الروابط الموقّعة تتغير مع كل طلب، فالتسمية
+  /// بحسب الرابط كانت تعيد التحميل في كل مرة.
+  final int? mediaId;
+  final String? fileName;
+
   const PremiumAudioPlayer({
     super.key,
     required this.audioUrl,
     required this.title,
+    this.mediaId,
+    this.fileName,
   });
 
   @override
@@ -101,12 +109,34 @@ class _PremiumAudioPlayerState extends State<PremiumAudioPlayer>
     }
   }
 
+  static const _audioExtensions = {
+    'mp3', 'wav', 'm4a', 'm4b', 'mp4', 'aac', 'ogg', 'oga', 'opus', //
+    '3gp', '3gpp', 'amr', 'wma', 'flac',
+  };
+
+  /// امتداد الملف الحقيقي (من اسم الملف ثم من الرابط). مهم لأن بعض
+  /// المشغلات (خصوصاً على iOS) تعتمد على الامتداد لتحديد الصيغة.
+  String _audioExtension(String url) {
+    String? extOf(String? value) {
+      if (value == null || !value.contains('.')) return null;
+      final ext = value.split('.').last.toLowerCase();
+      return _audioExtensions.contains(ext) ? ext : null;
+    }
+
+    final path = Uri.tryParse(url)?.path;
+    return extOf(widget.fileName) ?? extOf(path) ?? 'mp3';
+  }
+
   Future<File> _cacheFile(String url) async {
     final dir = await getTemporaryDirectory();
+    final ext = _audioExtension(url);
+    if (widget.mediaId != null) {
+      return File('${dir.path}/post_media_${widget.mediaId}.$ext');
+    }
     // ✅ v2: تغيير بادئة اسم الملف يجعل أي كاش قديم من نسخة سابقة (قد
     // يكون محفوظًا ناقصًا/تالفًا على أجهزة المستخدمين) يُتجاهل تلقائيًا
     // ويُعاد تحميله من جديد، دون الحاجة لأي تدخل يدوي من المستخدم.
-    return File('${dir.path}/audio_v2_${url.hashCode.abs()}.mp3');
+    return File('${dir.path}/audio_v2_${url.hashCode.abs()}.$ext');
   }
 
   Future<void> _deleteCacheFile(String url) async {

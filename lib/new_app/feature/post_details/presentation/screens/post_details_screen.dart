@@ -73,12 +73,9 @@ class _PostDetailsView extends StatelessWidget {
             final post = state.post;
             final media = state.media;
 
-            // ✅ تجاهل العنصر الأول إذا كان صورة
-            List<Media> filteredMedia = List.from(media);
-            if (filteredMedia.isNotEmpty &&
-                filteredMedia.first.type == 'image') {
-              filteredMedia = filteredMedia.sublist(1);
-            }
+            // ✅ نمرّر كل عناصر media للمعرض؛ هو يزيل الصورة الأولى فقط
+            // إذا كانت نفس الصورة المصغّرة المعروضة أعلى الصفحة.
+            final List<Media> filteredMedia = List.from(media);
 
             return CustomScrollView(
               controller: PrimaryScrollController.of(context),
@@ -223,6 +220,8 @@ class _PostDetailsView extends StatelessWidget {
                             child: PremiumMediaGallery(
                               media: filteredMedia,
                               screenWidth: screenWidth,
+                              postThumbnail:
+                                  post.thumbnailUrl ?? post.thumbnail,
                             ),
                           ),
 

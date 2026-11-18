@@ -12,6 +12,7 @@ import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widge
 import 'package:joy_of_change_v3/new_app/feature/post_details/presentation/widgets/youtube_player_widget.dart';
 
 import '../../domain/entities/media.dart';
+import 'document_card.dart';
 import 'drive_preview_widget.dart';
 import 'external_link_card.dart';
 
@@ -65,7 +66,12 @@ class MediaItemView extends StatelessWidget {
         return PremiumAudioPlayer(
           audioUrl: media.resolvedUrl,
           title: media.fileName,
+          mediaId: media.id,
+          fileName: media.fileName,
         );
+
+      case MediaType.document:
+        return DocumentCard(media: media);
 
       case MediaType.image:
         return GestureDetector(
