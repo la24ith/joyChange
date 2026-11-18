@@ -43,7 +43,9 @@ android {
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.release
+            // بدون key.properties (مثل البناء على GitHub Actions) نوقّع بمفتاح
+            // debug المؤقت: APK للتجربة فقط، لا يُرفع على المتجر.
+            signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
