@@ -34,6 +34,11 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      # gradle.properties فيه org.gradle.java.home لمسار Java على Windows
+      # (جهاز المطوّر)؛ نحذفه هنا فقط حتى يستخدم Gradle الـ Java 17 المثبّت.
+      - name: Remove local Java path
+        run: sed -i '/org.gradle.java.home/d' android/gradle.properties
+
       - run: flutter build apk --release
 
       - name: Rename APK
